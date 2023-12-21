@@ -1,19 +1,16 @@
 # AVR Photoalbum
 ## Project Overview:
 
-This project demonstrates the development of a photo album device using an AVR microcontroller, SD card, graphic LCD, and WiFi module. The device allows users to browse and view photos stored on an SD card, connect to a WiFi network, and upload photos to a cloud storage service.
+This project demonstrates the development of a photo album device using an AVR microcontroller, SD card, graphic LCD, joystick, and WiFi module. The device allows users to view photos stored on an SD card, browse photos using the joystick, connect to a WiFi network, and upload photos to a cloud storage service.
 
 ## Features:
 
-- Browse and view photos stored on an SD card using a 240x320 graphic LCD display.
+- View photos stored on an SD card using a 240x320 graphic LCD display.
+- Browse between photos using a joystick
 - Connect to a WiFi network using WiFi module.
 - Upload photos to a cloud storage service (e.g., Google Photos) via WiFi.
 - Implement a user interface with intuitive navigation and controls.
 - Optimize code for efficient memory usage and performance.
-
-## Target Audience:
-
-This project is intended for hobbyists, electronics enthusiasts, and students interested in developing embedded systems applications using microcontrollers, SD cards, graphic LCDs, and WiFi modules.
 
 ## Technologies Used:
 
@@ -23,6 +20,7 @@ This project is intended for hobbyists, electronics enthusiasts, and students in
 - WiFi module (e.g., ESP8266)
 - C programming language
 - Microchip studio
+- Joystick module
 
 ## Project Structure:
 

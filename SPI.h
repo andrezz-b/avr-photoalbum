@@ -11,7 +11,7 @@
 #define MISO     PB6
 #define SCK      PB7
 
-// macros
+// Macros for setting or clearing the chip select pin
 #define CS_CLEAR() SPI_PORT &= ~_BV(CS)
 #define CS_SET()   SPI_PORT |= _BV(CS)
 
@@ -34,8 +34,26 @@
 #define SPI_MODE_3     _BV(CPOL) | _BV(CPHA)
 #define SPI_DEFAULT    SPI_MASTER | SPI_FOSC_128 | SPI_MODE_0
 
-void    SPI_init(void);
+/**
+ * @brief Initialize the SPI interface.
+ *
+ * @details This function initializes the SPI interface. It sets the CS, MOSI,
+ * and SCK pins to output, and the MISO pin to input. It also enables the pull
+ * up resistor on the MISO pin. The SPI interface is set to master mode, with
+ * the clock set to fosc/128.
+ */
+void SPI_init(void);
+/**
+ * @brief Function to transmit a byte of data over the SPI interface.
+ * @param data The data byte to be transmitted.
+ * @return The status of the transmission. Typically, this is the data byte that
+ * was received while the transmission was taking place.
+ */
 uint8_t SPI_transmit(const uint8_t data);
+/**
+ * @brief Function which receives a byte of data over the SPI interface.
+ * @return The data byte that was received.
+ */
 uint8_t SPI_receive(void);
 
 #endif

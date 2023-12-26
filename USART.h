@@ -155,6 +155,11 @@ void USART_WriteLine(char* Data);
  */
 void USART_WriteDecimal(const uint32_t Value);
 
+/** @brief			Transmit a hex number with the USART interface.
+ *  @param val		Hex number
+ */
+void USART_WriteHex(uint8_t val);
+
 /** @brief				Set the baud rate of a USART interface.
  *  @param Baudrate	Baudrate for the interface
  *  @param Clock		USART module clock

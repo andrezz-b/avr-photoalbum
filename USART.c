@@ -2,13 +2,12 @@
 
 void USART_Init(USART_Config_t* Config)
 {
-    USART_SetBaudrate(Config->Baudrate, F_CPU,
-                      Config->EnableDoubleSpeed);
+    USART_SetBaudrate(Config->Baudrate, F_CPU, Config->EnableDoubleSpeed);
     USART_SetDirection(Config->Direction);
 
     // Configure the USART interface
-    UCSRC = _BV(URSEL) | Config->DeviceMode | Config->Stop | Config->Parity |
-            Config->Size | Config->ClockPolarity;
+    UCSRC = _BV(URSEL) | Config->DeviceMode | Config->Stop | Config->Parity | Config->Size |
+            Config->ClockPolarity;
 }
 
 void USART_Write(char* Data)
@@ -42,8 +41,24 @@ void USART_WriteDecimal(const uint32_t Number)
     USART_Write(Buffer);
 }
 
-void USART_SetBaudrate(const uint32_t Baudrate, const uint32_t Clock,
-                       const bool DoubleSpeed)
+void USART_WriteHex(uint8_t val)
+{
+    // extract upper and lower nibbles from input value
+    uint8_t upperNibble = (val & 0xF0) >> 4;
+    uint8_t lowerNibble = val & 0x0F;
+
+    // convert nibble to its ASCII hex equivalent
+    upperNibble += upperNibble > 9 ? 'A' - 10 : '0';
+    lowerNibble += lowerNibble > 9 ? 'A' - 10 : '0';
+
+    char buffer[3];
+    buffer[0] = upperNibble;
+    buffer[1] = lowerNibble;
+    buffer[2] = '\0';
+    USART_Write(buffer);
+}
+
+void USART_SetBaudrate(const uint32_t Baudrate, const uint32_t Clock, const bool DoubleSpeed)
 {
     /*  - Clock << DoubleSpeed - When using DobuleSpeed we need to divide by 8,
         but (Clock * 2) / 16 = Clock / 8

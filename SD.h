@@ -1,9 +1,8 @@
 #ifndef SD_H_
 #define SD_H_
 
-#ifndef SD_BLOCK_SIZE
-#define SD_BLOCK_SIZE 512
-#endif
+#include "config.h"
+#include <stdio.h>
 
 /** @brief	Macro to convert a SD command ID into a SD card command.
  * @details In SPI mode, each command for the SD card consists of an 8-bit

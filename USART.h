@@ -1,6 +1,7 @@
 #ifndef USART_H_
 #define USART_H_
 
+#include "config.h"
 #include <avr/io.h>
 #include <stdbool.h>
 
@@ -17,10 +18,6 @@
 #define XOFF 0x13 /**< Software flow control off */
 /** @} */         // end of Serial-Commands
 /** @} */         // end of Serial
-
-/** @brief	USART callback definition.
- */
-typedef void (*USART_Callback_t)(void);
 
 /** @brief USART parity modes.
  */
@@ -43,10 +40,10 @@ typedef enum
  */
 typedef enum
 {
-    USART_SIZE_5 = 0x00,                                 /**< 5 data bits */
-    USART_SIZE_6 = _BV(UCSZ0),                           /**< 6 data bits */
-    USART_SIZE_7 = _BV(UCSZ1),                           /**< 7 data bits */
-    USART_SIZE_8 = _BV(UCSZ1) | _BV(UCSZ0),              /**< 8 data bits */
+    USART_SIZE_5 = 0x00,                    /**< 5 data bits */
+    USART_SIZE_6 = _BV(UCSZ0),              /**< 6 data bits */
+    USART_SIZE_7 = _BV(UCSZ1),              /**< 7 data bits */
+    USART_SIZE_8 = _BV(UCSZ1) | _BV(UCSZ0), /**< 8 data bits */
 } USART_Size_t;
 
 /** @brief USART interface operation mode.
@@ -61,11 +58,10 @@ typedef enum
  */
 typedef enum
 {
-    USART_DIRECTION_NONE = 0x00, /**< No transmitter and receiver enabled */
-    USART_DIRECTION_TX   = _BV(TXEN), /**< Transmitter only */
-    USART_DIRECTION_RX   = _BV(RXEN), /**< Receiver only */
-    USART_DIRECTION_BOTH =
-        _BV(RXEN) | _BV(TXEN), /**< Receiver and transmitter */
+    USART_DIRECTION_NONE = 0x00,                  /**< No transmitter and receiver enabled */
+    USART_DIRECTION_TX   = _BV(TXEN),             /**< Transmitter only */
+    USART_DIRECTION_RX   = _BV(RXEN),             /**< Receiver only */
+    USART_DIRECTION_BOTH = _BV(RXEN) | _BV(TXEN), /**< Receiver and transmitter */
 } USART_Direction_t;
 
 /** @brief USART-SPI clock polarity.
@@ -80,15 +76,14 @@ typedef enum
  */
 typedef struct
 {
-    USART_DeviceMode_t DeviceMode; /**< USART device mode */
-    USART_Direction_t  Direction;  /**< Direction mode */
-    uint32_t           Baudrate;   /**< Baudrate */
-    USART_Parity_t     Parity;     /**< Parity settings */
-    USART_Stop_t       Stop;       /**< Stop bit settings */
-    USART_Size_t       Size;       /**< Data bit settings */
-    USART_Polarity_t
-         ClockPolarity; /**< Clock polarity. Only needed in synchronous mode */
-    bool EnableDoubleSpeed; /**< Set #true to enable double speed */
+    USART_DeviceMode_t DeviceMode;        /**< USART device mode */
+    USART_Direction_t  Direction;         /**< Direction mode */
+    uint32_t           Baudrate;          /**< Baudrate */
+    USART_Parity_t     Parity;            /**< Parity settings */
+    USART_Stop_t       Stop;              /**< Stop bit settings */
+    USART_Size_t       Size;              /**< Data bit settings */
+    USART_Polarity_t   ClockPolarity;     /**< Clock polarity. Only needed in synchronous mode */
+    bool               EnableDoubleSpeed; /**< Set #true to enable double speed */
 } USART_Config_t;
 
 /** @brief				Set the direction of the USART interface.
@@ -105,8 +100,7 @@ static inline void USART_SetDirection(const USART_Direction_t Direction)
 /** @brief		Get the direction of the USART interface.
  *  @return	USART direction
  */
-static inline USART_Direction_t USART_GetDirection(void)
-    __attribute__((always_inline));
+static inline USART_Direction_t USART_GetDirection(void) __attribute__((always_inline));
 static inline USART_Direction_t USART_GetDirection(void)
 {
     return (USART_Direction_t) (UCSRB & (_BV(RXEN) | _BV(TXEN)));
@@ -124,8 +118,7 @@ static inline char USART_GetChar(void)
 /** @brief			Transmit a single byte with the USART interface.
  *  @param Data	Data byte
  */
-static inline void USART_SendChar(const char Data)
-    __attribute__((always_inline));
+static inline void USART_SendChar(const char Data) __attribute__((always_inline));
 static inline void USART_SendChar(const char Data)
 {
     // Ignore 9 bit mode if it is enabled
@@ -167,7 +160,6 @@ void USART_WriteDecimal(const uint32_t Value);
  *  @param Clock		USART module clock
  *  @param DoubleSpeed	Double speed enabled/disabled
  */
-void USART_SetBaudrate(const uint32_t BaudRate, const uint32_t Clock,
-                       const bool DoubleSpeed);
+void USART_SetBaudrate(const uint32_t BaudRate, const uint32_t Clock, const bool DoubleSpeed);
 
 #endif /* USART_H_ */

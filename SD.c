@@ -84,7 +84,7 @@ static uint32_t Wait = 0x00;
  * @link
  * https://kampi.gitbook.io/avr/sd-card-support-for-avr#a-deeper-look-into-the-sd-card
  */
-static void SD_select()
+static void SD_Select()
 {
     SPI_transmit(0xff);
     CS_CLEAR();
@@ -424,7 +424,7 @@ static const SD_Error_t SD_InitializeCard(void)
 
 const SD_Error_t SD_Init(/*SPIM_Config_t* Config */)
 {
-    uint32_t   OldFreq   = 0x00;
+    // uint32_t   OldFreq   = 0x00;
     SD_Error_t ErrorCode = SD_SUCCESSFULL;
 
     // Set SD card CS pin as output in high state

@@ -1,5 +1,6 @@
 #include "SD.h"
 #include "SPI.h"
+#include <stddef.h>
 
 /** @defgroup SD
  *  @{
@@ -66,6 +67,18 @@
 /** @} */                             // end of Errors
 /** @} */                             // end of SD
 
+/*
+ * Current card type
+ */
+static SD_CardType_t __CardType = SD_VER_UNKNOWN;
+
+/*
+ *	Current SD card status
+ */
+static SD_Status_t __CardStatus;
+
+static uint32_t Wait = 0x00;
+
 /**
  * @brief	Select the SD card
  * @link
@@ -95,6 +108,163 @@ static void SD_Deselect(void)
     }
 }
 
+/** @brief			Send a command to the SD card.
+ * @details This function sends a command to the SD card. If the command is an
+ * ACMD, it first sends the command 55 to initiate the command sequence. Then it
+ * sends the actual command. The card is selected and the command along with its
+ * arguments and a checksum is sent. It then sends 8 bytes of data to bridge the
+ * time NCR and checks for a response from the card. After receiving a response,
+ * the function exits. It is recommended to generate eight more clock cycles
+ * (i.e., send an empty byte) after receiving the card's response to give the SD
+ * card controller extra time to process internal processes.
+ *  @param Command	Command code
+ *  @param Arg		Command argument
+ *  @return			R1 response
+ */
+static const uint8_t SD_SendCommand(const uint8_t Command, const uint32_t Arg)
+{
+    uint8_t Response    = 0x00;
+    uint8_t CommandTemp = Command;
+
+    // Dummy CRC + Stop
+    uint8_t Checksum = 0x01;
+
+    SD_Select();
+
+    // Send ACMD<n> command, ACMD<n>: Combination of the command CMD55 and
+    // CMD<n>
+    if (CommandTemp & 0x80)
+    {
+        // Clear ACMD-Flag
+        CommandTemp &= 0x7F;
+
+        Response = SD_SendCommand(SD_ID_TO_CMD(SD_CMD_APP_CMD), 0x00);
+        if (Response > 0x01)
+        {
+            return Response;
+        }
+    }
+
+    SPI_transmit(CommandTemp);
+    SPI_transmit((Arg >> 0x18) & 0xFF);
+    SPI_transmit((Arg >> 0x10) & 0xFF);
+    SPI_transmit((Arg >> 0x08) & 0xFF);
+    SPI_transmit(Arg);
+
+    if (CommandTemp == SD_ID_TO_CMD(SD_CMD_GO_IDLE))
+    {
+        // Valid CRC for CMD0(0)
+        Checksum = 0x95;
+    }
+    else if (CommandTemp == SD_ID_TO_CMD(SD_CMD_IF_COND))
+    {
+        // Valid CRC for CMD8(0x1AA)
+        Checksum = 0x87;
+    }
+
+    SPI_transmit(Checksum);
+
+    if (CommandTemp == SD_ID_TO_CMD(SD_CMD_STOP_TRANSMISSION))
+    {
+        // Skip stuff byte when transmission stop
+        SPI_transmit(0xFF);
+    }
+
+    // Wait for the response (0 - 8 bytes for SD cards and 1 - 8 bytes for MMC)
+    for (uint8_t i = 0x00; i < 0x08; i++)
+    {
+        uint8_t DataIn = SPI_transmit(0xFF);
+        if (DataIn != 0xFF)
+        {
+            // 8 dummy cycles if the command is a write command
+            // https://2517979152-files.gitbook.io/~/files/v0/b/gitbook-legacy-files/o/assets%2F-LvA_nizlqrtUSmfwyso%2F-LvBj0mh3FNDeXYIfLUd%2F-LvBlobXaSD-UZoOZapB%2FSD(8).png?alt=media&token=4514e32f-2aa4-4d48-aa49-c7f2380bb7d6
+            if (SD_ID_TO_CMD(SD_CMD_WRITE_SINGLE_BLOCK) ||
+                SD_ID_TO_CMD(SD_CMD_WRITE_MULTIPLE_BLOCK))
+            {
+                SPI_transmit(0xFF);
+            }
+
+            return DataIn;
+        }
+    }
+
+    return SD_NO_RESPONSE;
+}
+
+/** @brief			Read a single block of data from the SD card.
+ *  @param Length	Block length
+ *  @param Buffer	Pointer to data buffer
+ *  @return			Error code
+ */
+static const SD_Error_t SD_ReadBlock(const uint32_t Length, uint8_t* Buffer)
+{
+    uint8_t Response = 0xFF;
+
+    // Wait for the data token
+    Wait = 0x00;
+    while ((++Wait < 0x2710) && (Response == 0xFF))
+    {
+        Response = SPI_transmit(0xFF);
+        if (Wait >= 0x2710)
+        {
+            SD_Deselect();
+
+            return SD_NO_RESPONSE;
+        }
+    }
+
+    // Get the data
+    for (uint32_t i = 0x00; i < Length; i++)
+    {
+        *Buffer++ = SPI_transmit(0xFF);
+    }
+
+    // Skip checksum
+    SPI_transmit(0xFF);
+    SPI_transmit(0xFF);
+
+    return SD_SUCCESSFULL;
+}
+
+/** @brief			Read a single block of data from the SD card.
+ *  @param Buffer	Pointer to data buffer
+ *  @param Length	Block length
+ *  @param Token	Stop token
+ *  @return			Error code
+ */
+static const SD_Error_t SD_WriteBlock(const uint8_t* Buffer, const uint32_t Length,
+                                      const uint8_t Token)
+{
+    uint8_t* Buffer_Temp = (uint8_t*) Buffer;
+
+    // Send the token
+    SPI_transmit(Token);
+    if (Token != SD_TOKEN_STOP)
+    {
+        // Send the data
+        for (uint32_t i = 0x00; i < Length; i++)
+        {
+            SPI_transmit(*Buffer_Temp++);
+        }
+
+        // Skip checksum
+        SPI_transmit(0xFF);
+        SPI_transmit(0xFF);
+
+        // Get the response
+        if ((SPI_transmit(0xFF) & 0x1F) != 0x05)
+        {
+            return SD_NO_RESPONSE;
+        }
+    }
+
+    // Wait until the card clears busy state
+    while (SPI_transmit(0xFF) != 0xFF)
+        ;
+
+    return SD_SUCCESSFULL;
+}
+
 /** @brief		Perform a software reset with the SD card.
  *  @return		Error code
  */
@@ -116,6 +286,446 @@ static const SD_Error_t SD_SoftwareReset(void)
             return SD_NO_RESPONSE;
         }
     }
+
+    SD_Deselect();
+
+    return SD_SUCCESSFULL;
+}
+
+/** @brief				Set the block length of the SD card.
+ *						NOTE: Only available for version 1 cards or MMC.
+ *  @param BlockLength	Block length
+ *  @return				Error code
+ */
+static SD_Error_t SD_SetBlockLength(const uint16_t BlockLength)
+{
+    SD_Error_t ErrorCode = SD_SendCommand(SD_ID_TO_CMD(SD_CMD_SET_BLOCKLEN), BlockLength);
+    SD_Deselect();
+
+    return ErrorCode;
+}
+
+/** @brief		Initialize the SD card.
+ * @details An R3 response always includes the current value of the status
+ * register (i.e., an R1 response) as well as the value of the OCR register.
+ *  @return		Error code
+ */
+static const SD_Error_t SD_InitializeCard(void)
+{
+    uint8_t Response = 0x00;
+    uint8_t Buffer[4];
+
+    Response = SD_SendCommand(SD_ID_TO_CMD(SD_CMD_IF_COND), 0x1AA);
+    for (uint8_t i = 0x00; i < 0x04; i++)
+    {
+        Buffer[i] = SPI_transmit(0xFF);
+    }
+
+    if (Response == SD_STATE_IDLE)
+    {
+        /*
+            Version 2 or later SD card
+        */
+
+        // This code is constructing a 32-bit (4-byte) integer from an array of
+        // 4 bytes. It's doing this by shifting each byte into its correct
+        // position in the 32-bit integer.
+        uint32_t R3 = ((uint32_t) Buffer[3]) << 0x18;
+        R3 |= ((uint32_t) Buffer[2]) << 0x10;
+        R3 |= ((uint32_t) Buffer[1]) << 0x08;
+        R3 |= ((uint32_t) Buffer[0]);
+
+        // Send ACMD41 and check for ready
+        Wait = 0x00;
+        while ((++Wait < 0x2710) &&
+               (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_ACMD41), ((uint32_t) 0x40000000)) != 0x00))
+        {
+            if (Wait >= 0x2710)
+            {
+                SD_Deselect();
+
+                return SD_NO_RESPONSE;
+            }
+        }
+
+        // Send CMD58 to read OCR
+        Response = SD_SendCommand(SD_ID_TO_CMD(SD_CMD_READ_OCR), 0x00);
+        for (uint8_t i = 0x00; i < 0x04; i++)
+        {
+            Buffer[i] = SPI_transmit(0xFF);
+        }
+
+        if (Response == SD_STATE_SUCCESSFULL)
+        {
+            R3 = ((uint32_t) Buffer[3]) << 0x18;
+            R3 |= ((uint32_t) Buffer[2]) << 0x10;
+            R3 |= ((uint32_t) Buffer[1]) << 0x08;
+            R3 |= ((uint32_t) Buffer[0]);
+        }
+        else
+        {
+            __CardType = SD_VER_UNKNOWN;
+        }
+
+        // Check if the CCS bit is set
+        if (R3 & ((uint32_t) 0x01 << 0x1E))
+        {
+            __CardType = SD_VER_2_HI;
+        }
+        else
+        {
+            __CardType = SD_VER_2_STD;
+        }
+    }
+    else if (Response & SD_STATE_ILLEGAL_COMMAND)
+    {
+        /*
+            Version 1 SD card or MMC
+        */
+
+        // Check for version 1 SD card
+        Wait = 0x00;
+        while (++Wait < 0xFF)
+        {
+            if (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_ACMD41), 0x00) == SD_STATE_SUCCESSFULL)
+            {
+                __CardType = SD_VER_1_STD;
+
+                break;
+            }
+        }
+
+        // Check for multimedia card
+        Wait = 0x00;
+        if (Response & SD_STATE_ILLEGAL_COMMAND)
+        {
+            while (++Wait < 0xFF)
+            {
+                if (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_SEND_OP_COND), 0x00) == SD_STATE_SUCCESSFULL)
+                {
+                    __CardType = SD_MMC;
+
+                    break;
+                }
+            }
+        }
+    }
+    else
+    {
+        SD_Deselect();
+
+        return Response;
+    }
+
+    SD_Deselect();
+
+    return SD_SUCCESSFULL;
+}
+
+const SD_Error_t SD_Init(/*SPIM_Config_t* Config */)
+{
+    uint32_t   OldFreq   = 0x00;
+    SD_Error_t ErrorCode = SD_SUCCESSFULL;
+
+    // Set SD card CS pin as output in high state
+    CS_SET();
+
+    // if(Config != NULL)
+    // {
+    // 	SD_SPIM_INIT(Config);
+    // }
+
+    // Use 100 kHz to initialize the card
+    // OldFreq = SD_SPIM_GET_CLOCK(&CONCAT(SD_INTERFACE),
+    // SysClock_GetClockPer()); SD_SPIM_SET_CLOCK(&CONCAT(SD_INTERFACE), 100000,
+    // SysClock_GetClockPer());
+
+    // Reset the SD card
+    ErrorCode = SD_SoftwareReset();
+    if (ErrorCode != SD_SUCCESSFULL)
+    {
+        return ErrorCode;
+    }
+
+    // Initialize the SD card
+    ErrorCode = SD_InitializeCard();
+    if (ErrorCode != SD_SUCCESSFULL)
+    {
+        return ErrorCode;
+    }
+
+    // Change the frequency back to the old value
+    // SD_SPIM_SET_CLOCK(&CONCAT(SD_INTERFACE), OldFreq,
+    // SysClock_GetClockPer());
+
+    // Set the block length to 512 (only necessary if the card is not a SDXC or
+    // SDHX card)
+    if ((__CardType != SD_VER_2_HI) && (__CardType != SD_VER_2_STD))
+    {
+        ErrorCode = SD_SetBlockLength(SD_BLOCK_SIZE);
+        if (ErrorCode != SD_SUCCESSFULL)
+        {
+            return ErrorCode;
+        }
+    }
+
+    return ErrorCode;
+}
+
+void SD_Sync(void)
+{
+    SD_Deselect();
+}
+
+const SD_Error_t SD_GetStatus(SD_Status_t* Status)
+{
+    uint8_t* Ptr = (uint8_t*) Status;
+
+    if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_ACMD13), 0x00) == SD_SUCCESSFULL) &&
+        (SD_ReadBlock(sizeof(SD_Status_t), Ptr) == SD_SUCCESSFULL))
+    {
+        SD_Deselect();
+
+        return SD_SUCCESSFULL;
+    }
+
+    SD_Deselect();
+
+    return SD_NO_RESPONSE;
+}
+
+const SD_Error_t SD_GetCSD(SD_CSD_t* CSD)
+{
+    uint8_t* Ptr = (uint8_t*) CSD;
+
+    // Get the data
+    if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_SEND_CSD), 0x00) == SD_SUCCESSFULL) &&
+        (SD_ReadBlock(sizeof(SD_CSD_t), Ptr) == SD_SUCCESSFULL))
+    {
+        SD_Deselect();
+
+        return SD_SUCCESSFULL;
+    }
+
+    SD_Deselect();
+
+    return SD_NO_RESPONSE;
+}
+
+const SD_Error_t SD_GetCID(SD_CID_t* CID)
+{
+    uint8_t* Ptr = (uint8_t*) CID;
+
+    // Get the data
+    if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_SEND_CID), 0x00) == SD_SUCCESSFULL) &&
+        (SD_ReadBlock(sizeof(SD_CID_t), Ptr) == SD_SUCCESSFULL))
+    {
+        SD_Deselect();
+
+        return SD_SUCCESSFULL;
+    }
+
+    SD_Deselect();
+
+    return SD_NO_RESPONSE;
+}
+
+const SD_Error_t SD_GetOCR(SD_OCR_t* OCR)
+{
+    uint8_t* Ptr = (uint8_t*) OCR;
+
+    if (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_READ_OCR), 0x00) != SD_SUCCESSFULL)
+    {
+        SD_Deselect();
+
+        return SD_NO_RESPONSE;
+    }
+
+    // Get the data
+    for (uint8_t i = 0x00; i < sizeof(SD_OCR_t); i++)
+    {
+        *Ptr++ = SPI_transmit(0xFF);
+    }
+
+    SD_Deselect();
+
+    return SD_SUCCESSFULL;
+}
+
+const SD_Error_t SD_GetSectors(uint32_t* Sectors)
+{
+    uint32_t Size;
+    uint8_t  CSD[16];
+
+    SD_Error_t ErrorCode = SD_GetCSD((SD_CSD_t*) CSD);
+    if (ErrorCode != SD_SUCCESSFULL)
+    {
+        return ErrorCode;
+    }
+
+    /*
+        Version 2 or later SD card
+    */
+    if ((__CardType == SD_VER_2_STD) || (__CardType == SD_VER_2_HI))
+    {
+        Size     = CSD[9] + (CSD[8] << 8) + 0x01;
+        *Sectors = Size << 0x0A;
+    }
+    /*
+        Version 1 or MMC
+    */
+    else
+    {
+        uint8_t Shift =
+            (CSD[5] & 0x0E) + ((CSD[10] & 0x80) >> 0x07) + ((CSD[9] & 0x03) << 0x01) + 0x02;
+        Size     = (CSD[8] >> 0x06) + (CSD[7] << 0x02) + ((CSD[6] & 0x03) << 0x0A) + 0x01;
+        *Sectors = Size << (Shift - 0x09);
+    }
+
+    return SD_SUCCESSFULL;
+}
+
+const SD_Error_t SD_GetEraseBlockSize(uint16_t* EraseSize)
+{
+    /*
+        Version 2 or later SD card
+    */
+    if ((__CardType == SD_VER_2_STD) || (__CardType == SD_VER_2_HI))
+    {
+        SD_Error_t Error = SD_GetStatus(&__CardStatus);
+
+        *EraseSize = __CardStatus.ERASE_SIZE;
+
+        return Error;
+    }
+    /*
+        Version 1 or MMC
+    */
+    else
+    {
+        uint8_t Buffer[16];
+
+        if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_SEND_CSD), 0x00) != 0x00) &&
+            (SD_ReadBlock(16, Buffer) != SD_SUCCESSFULL))
+        {
+            SD_Deselect();
+
+            return SD_NO_RESPONSE;
+        }
+
+        if (__CardType == SD_VER_1_STD)
+        {
+            // ToDo
+        }
+        else
+        {
+            // ToDo
+        }
+    }
+
+    SD_Deselect();
+
+    return SD_SUCCESSFULL;
+}
+
+const SD_CardType_t SD_GetCardType(void)
+{
+    return __CardType;
+}
+
+const SD_Error_t SD_ReadDataBlock(const uint32_t Address, uint8_t* Buffer)
+{
+    if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_READ_SINGLE_BLOCK), Address) == SD_SUCCESSFULL) &&
+        (SD_ReadBlock(SD_BLOCK_SIZE, Buffer) == SD_SUCCESSFULL))
+    {
+        SD_Deselect();
+
+        return SD_SUCCESSFULL;
+    }
+
+    SD_Deselect();
+
+    return SD_NO_RESPONSE;
+}
+
+const SD_Error_t SD_ReadDataBlocks(const uint32_t Address, const uint32_t Blocks, uint8_t* Buffer)
+{
+    SD_Error_t ErrorCode;
+
+    // Send the command
+    if (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_READ_MULTIPLE_BLOCK), Address) != SD_SUCCESSFULL)
+    {
+        SD_Deselect();
+
+        return SD_NO_RESPONSE;
+    }
+
+    // Read all data
+    for (uint32_t i = 0x00; i < Blocks; i++)
+    {
+        ErrorCode = SD_ReadBlock(SD_BLOCK_SIZE, Buffer);
+        if (ErrorCode != SD_SUCCESSFULL)
+        {
+            SD_Deselect();
+
+            return ErrorCode;
+        }
+
+        Buffer += SD_BLOCK_SIZE;
+    }
+
+    // Send stop token
+    SD_SendCommand(SD_ID_TO_CMD(SD_CMD_STOP_TRANSMISSION), 0x00);
+
+    SD_Deselect();
+
+    return SD_SUCCESSFULL;
+}
+
+const SD_Error_t SD_WriteDataBlock(const uint32_t Address, const uint8_t* Buffer)
+{
+    if ((SD_SendCommand(SD_ID_TO_CMD(SD_CMD_WRITE_SINGLE_BLOCK), Address) == SD_SUCCESSFULL) &&
+        (SD_WriteBlock(Buffer, SD_BLOCK_SIZE, SD_TOKEN_DATA) == SD_SUCCESSFULL))
+    {
+        SD_Deselect();
+
+        return SD_SUCCESSFULL;
+    }
+
+    SD_Deselect();
+
+    return SD_NO_RESPONSE;
+}
+
+const SD_Error_t SD_WriteDataBlocks(const uint32_t Address, const uint32_t Blocks,
+                                    const uint8_t* Buffer)
+{
+    SD_Error_t ErrorCode;
+
+    // Send the command
+    if (SD_SendCommand(SD_ID_TO_CMD(SD_CMD_WRITE_MULTIPLE_BLOCK), Address) != SD_SUCCESSFULL)
+    {
+        SD_Deselect();
+
+        return SD_NO_RESPONSE;
+    }
+
+    // Write all data
+    for (uint32_t i = 0x00; i < Blocks; i++)
+    {
+        ErrorCode = SD_WriteBlock(Buffer, SD_BLOCK_SIZE, SD_TOKEN_DATA_CMD25);
+        if (ErrorCode != SD_SUCCESSFULL)
+        {
+            SD_Deselect();
+
+            return ErrorCode;
+        }
+
+        Buffer += SD_BLOCK_SIZE;
+    }
+
+    // Send stop token
+    SD_WriteBlock(NULL, 0, SD_TOKEN_STOP);
 
     SD_Deselect();
 

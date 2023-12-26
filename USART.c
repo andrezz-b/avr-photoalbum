@@ -2,7 +2,7 @@
 
 void USART_Init(USART_Config_t* Config)
 {
-    USART_SetBaudrate(Config->Baudrate, SysClock_GetCPUClock(),
+    USART_SetBaudrate(Config->Baudrate, F_CPU,
                       Config->EnableDoubleSpeed);
     USART_SetDirection(Config->Direction);
 

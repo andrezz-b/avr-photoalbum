@@ -8,8 +8,6 @@ AllowShortIfStatementsOnASingleLine: false
 AllowShortLoopsOnASingleLine: false
 AllowShortFunctionsOnASingleLine: None
 AlignAfterOpenBracket: Align
-AlignConsecutiveAssignments: true
-AlignConsecutiveDeclarations: true
 AlignConsecutiveMacros: true
 AlignEscapedNewlines: Left
 AlignOperands: true

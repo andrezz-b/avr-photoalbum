@@ -112,7 +112,8 @@ static inline USART_Direction_t USART_GetDirection(void)
 static inline char USART_GetChar(void) __attribute__((always_inline));
 static inline char USART_GetChar(void)
 {
-    return UDR;
+    while (!(UCSRA & _BV(RXC)));/* Wait till data is received */
+	return(UDR);	
 }
 
 /** @brief			Transmit a single byte with the USART interface.

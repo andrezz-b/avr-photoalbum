@@ -7,7 +7,6 @@
 #include <avr/interrupt.h>
 #include <util/delay.h>
 
-#include <stdarg.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -37,17 +36,6 @@ static DWORD pn(          /* Pseudo random number generator */
     return lfsr;
 }
 
-void USART_printf(const char* format, ...)
-{
-    char buffer[512];
-    va_list args;
-    va_start(args, format);
-    vsnprintf(buffer, sizeof(buffer), format, args);
-    va_end(args);
-
-    USART_Write(buffer);
-}
-
 SD_Error_t Error;
 USART_Config_t USART_Config = {
     .DeviceMode = USART_MODE_ASYNCH,
@@ -63,14 +51,19 @@ USART_Config_t USART_Config = {
 uint8_t is_newline(const char);
 void sd_usart_read_write();
 void write_to_sd_card();
-uint8_t disk_test(BYTE disk_id);
+uint8_t disk_function_test(BYTE disk_id);
+void fatfs_write_file();
+void fatfs_read_file();
 
 int main(void)
 {
     USART_Init(&USART_Config);
     SPI_init();
 
-    uint8_t result = disk_test(0);
+    // disk_function_test(0);
+    // fatfs_write_file();
+    // fatfs_read_file();
+    // sd_usart_read_write();
 
     while (1)
         ;
@@ -78,14 +71,51 @@ int main(void)
     return 0;
 }
 
-uint8_t disk_test(BYTE disk_id)
+void fatfs_write_file()
+{
+    FATFS fs;
+    FIL file;
+
+    const char string[] = "Hello world!\0";
+    uint16_t bytes_written = 0;
+
+    /* Open or create a log file and ready to append */
+    USART_printf("f_mount: %d\n\r", f_mount(&fs, "", 0));
+    USART_printf("f_open: %d\n\r", f_open(&file, "test.txt", FA_WRITE | FA_CREATE_ALWAYS));
+    USART_printf("f_write: %d bytes_written: %d\n\r", f_write(&file, string, 32, &bytes_written),
+                 bytes_written);
+    USART_printf("f_sync: %d\n\r", f_sync(&file));
+    USART_printf("f_close: %d\n\r", f_close(&file));
+
+    _delay_ms(100);
+}
+
+void fatfs_read_file()
+{
+    FATFS fs;
+    FIL file;
+
+    unsigned char ReadData[32];
+    unsigned int bytes_read = 0;
+
+    /* Open or create a log file and ready to append */
+    USART_printf("f_mount: %d\n\r", f_mount(&fs, "", 0));
+    USART_printf("f_open: %d\n\r", f_open(&file, "test.txt", FA_READ));
+    USART_printf("f_read: %d, bytes_read: %d\n\r", f_read(&file, ReadData, 32, &bytes_read),
+                 bytes_read);
+    USART_printf("f_close: %d\n\r", f_close(&file));
+
+    _delay_ms(100);
+}
+
+uint8_t disk_function_test(BYTE disk_id)
 {
     DSTATUS disk_status;
     DRESULT disk_result;
     uint8_t buffer[530];
     uint32_t sector = 0;
     uint32_t pns = 1;
-    uint16_t disk_size, buffer_size = sizeof(buffer), n = 0, sector_size = 512, ns;
+    uint16_t disk_size, n = 0, sector_size = 512;
 
     USART_printf(" disk_initalize(%u)", disk_id);
     disk_status = disk_initialize(disk_id);
@@ -246,7 +276,8 @@ uint8_t disk_test(BYTE disk_id)
             USART_printf(" - failed.\n\r");
             return 19;
         }
-        USART_printf(" disk_write(%u, 0x%X, %lu, 1)", disk_id, (UINT) (buffer + sector_size), sector2);
+        USART_printf(" disk_write(%u, 0x%X, %lu, 1)", disk_id, (UINT) (buffer + sector_size),
+                     sector2);
         disk_result = disk_write(disk_id, buffer + sector_size, sector2, 1);
         if (disk_result == RES_OK)
         {
@@ -280,7 +311,8 @@ uint8_t disk_test(BYTE disk_id)
             USART_printf(" - failed.\n\r");
             return 22;
         }
-        USART_printf(" disk_read(%u, 0x%X, %lu, 1)", disk_id, (UINT) (buffer + sector_size), sector2);
+        USART_printf(" disk_read(%u, 0x%X, %lu, 1)", disk_id, (UINT) (buffer + sector_size),
+                     sector2);
         disk_result = disk_read(disk_id, buffer + sector_size, sector2, 1);
         if (disk_result == RES_OK)
         {

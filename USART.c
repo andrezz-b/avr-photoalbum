@@ -1,4 +1,5 @@
 #include "USART.h"
+#include <stdarg.h>
 
 void USART_Init(USART_Config_t* Config)
 {
@@ -55,6 +56,17 @@ void USART_WriteHex(uint8_t val)
     buffer[0] = upperNibble;
     buffer[1] = lowerNibble;
     buffer[2] = '\0';
+    USART_Write(buffer);
+}
+
+void USART_printf(const char* format, ...)
+{
+    char buffer[128];
+    va_list args;
+    va_start(args, format);
+    vsnprintf(buffer, sizeof(buffer), format, args);
+    va_end(args);
+
     USART_Write(buffer);
 }
 

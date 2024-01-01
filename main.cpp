@@ -1,17 +1,17 @@
 /**
  * @file main.cpp
- * 
+ *
  * @author
  * Angelo Elias Dalzotto (150633@upf.br)
  * GEPID - Grupo de Pesquisa em Cultura Digital (http://gepid.upf.br/)
  * Universidade de Passo Fundo (http://www.upf.br/)
- * 
+ *
  * @copyright
  * Copyright (C) 2018 by Angelo Elias Dalzotto
- * 
+ *
  * @brief This is a pure AVR port of the Arduino Sd2Card Library.
  * This file has the example for the library.
- * 
+ *
  * This Library is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -26,12 +26,20 @@
  * along with the Arduino Sd2Card Library.  If not, see
  * <http://www.gnu.org/licenses/>.
  */
-#include <avr/io.h>
-#include <serial.h>
-#include <SDCard.h>
 #include <FAT.h>
 #include <File.h>
+#include <SDCard.h>
 #include <SPI.h>
+#include <avr/io.h>
+#include <serial.h>
+#include <util/delay.h>
+extern "C"
+{
+#include "lib/ili9341.h"
+}
+
+#define TFT_WIDTH  ILI9341_MAX_X
+#define TFT_HEIGHT ILI9341_MAX_Y
 
 SDCard disk(&PORTB, &DDRB, PB4);
 FAT fs(&disk);
@@ -40,101 +48,226 @@ File file(&fs);
 
 void handle_error()
 {
-    switch(disk.get_error()){
-    case SDCard::Error::CMD0:
-        printf("timeout error for command CMD0\n");
-        break;
-    case SDCard::Error::CMD8:
-        printf("CMD8 was not accepted - not a valid SD card\n");
-        break;
-    case SDCard::Error::ACMD41:
-        printf("card's ACMD41 initialization process timeout\n");
-        break;
-    case SDCard::Error::CMD58:
-        printf("card returned an error response for CMD58 (read OCR)\n");
-        break;
-    case SDCard::Error::CMD24:
-        printf("card returned an error response for CMD24 (write block)\n");
-        break;
-    default:
-        printf("Unknown error. Code %x\n", (uint8_t)disk.get_error());
-        break;
+    switch (disk.get_error())
+    {
+        case SDCard::Error::CMD0:
+            printf("timeout error for command CMD0\n");
+            break;
+        case SDCard::Error::CMD8:
+            printf("CMD8 was not accepted - not a valid SD card\n");
+            break;
+        case SDCard::Error::ACMD41:
+            printf("card's ACMD41 initialization process timeout\n");
+            break;
+        case SDCard::Error::CMD58:
+            printf("card returned an error response for CMD58 (read OCR)\n");
+            break;
+        case SDCard::Error::CMD24:
+            printf("card returned an error response for CMD24 (write block)\n");
+            break;
+        default:
+            printf("Unknown error. Code %x\n", (uint8_t) disk.get_error());
+            break;
     }
 }
+void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y);
+uint32_t read32(File &f);
+uint16_t read16(File &f);
 
 int main()
 {
     uart_init();
     printf("Initializing SD card...\n");
-    if(disk.init()){
+    if (disk.init())
+    {
         printf("Card connected!\n");
-    } else {
+    }
+    else
+    {
         printf("Card initialization failed.\n");
         handle_error();
     }
     SPI::set_speed(); // Max speed for now
-    // uint8_t buffer[512];
-    // disk.read_block(0, buffer);
-    // for(int i = 0; i < 512; i++) {
-    //     if(i % 64 == 0)
-    //         printf("\n");
-    //     printf("%02X", buffer[i]);
-    // }
+
+    // init lcd
+    ILI9341_Init();
+
+    // clear Screen
+    ILI9341_ClearScreen(ILI9341_BLACK);
+
+    // // draw horizontal fast line
+    // ILI9341_DrawLineHorizontal(10, ILI9341_MAX_X - 10, 12, ILI9341_WHITE);
+    // // draw horizontal fast line
+    // ILI9341_DrawLineHorizontal(10, ILI9341_MAX_X - 10, 50, ILI9341_WHITE);
+
+    // // set position
+    // ILI9341_SetPosition(11, 25);
+    // // draw string
+    // ILI9341_DrawString("ILI9341 LCD DRIVER", ILI9341_RED, X3);
 
     printf("\nMounting FAT Filesystem...\n");
-    if(fs.mount()){
+    if (fs.mount())
+    {
         printf("Filesystem mounted!\n");
-    } else {
+    }
+    else
+    {
         printf("Mount error.\n");
         handle_error();
     }
 
     printf("\nOpening filesystem root...\n");
-    if(root.open_root()){
+    if (root.open_root())
+    {
         printf("Root is open\n");
-    } else {
+    }
+    else
+    {
         printf("Unable to open root\n");
         handle_error();
     }
 
-    printf("\nOpening file for write\n");
+    bmpDraw(root, "img2.bmp", 0, 0);
 
-    if(file.open(root, "TEST.TXT", File::O_CREAT | File::O_WRITE)){
-        printf("TEST.txt opened\n");
-        if(file.rm()){
-            printf("Ensuring file new\n");
-            if(file.open(root, "TEST.TXT", File::O_CREAT | File::O_WRITE))
-                printf("New test.txt opened\n");
-            else
-                return 0;
-        } else
-            return 0;
-        printf("Writing to file\n");
-        char buffer[127];
-        sprintf(buffer, "Teste abcdefghijklmnopqrstuvwxyz %u\n", 1);
-        if(file.write((const uint8_t*)buffer, strlen(buffer)) != strlen(buffer)){
-            printf("Write error\n");
-            handle_error();
-        } else {
-            file.close();
-            printf("Done\n");
-        }
-    } else {
-        printf("Unable to open file to write\n");
-        handle_error();
-    }
-    file.close();
-
-    printf("\nOpening for read\n");
-    if(file.open(root, "TEST.TXT", File::O_RDONLY)){
-        printf("TEST.txt opened\n");
-        while(file.available())
-            printf("%c", file.read());
-    } else {
-        printf("Unable to open file to write\n");
-        handle_error();
-    }
-    file.close();
-    
     return 0;
+}
+
+#define BUFFPIXEL 40
+
+void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y)
+{
+    File bmpFile(&fs);
+    int bmpWidth, bmpHeight;            // W+H in pixels
+    uint8_t bmpDepth;                   // Bit depth (currently must be 24)
+    uint32_t bmpImageoffset;            // Start of image data in file
+    uint32_t rowSize;                   // Not always = bmpWidth; may have padding
+    uint8_t sdbuffer[3 * BUFFPIXEL];    // pixel buffer (R+G+B per pixel)
+    uint8_t buffidx = sizeof(sdbuffer); // Current position in sdbuffer
+    bool goodBmp = false;               // Set to true on valid header parse
+    bool flip = true;                   // BMP is stored bottom-to-top
+    int w, h, row, col;
+    uint8_t r, g, b;
+    uint32_t pos = 0;
+
+    if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))
+        return;
+
+    printf("Loading image %s\n", filename);
+
+    // Open requested file on SD card
+    if (!bmpFile.open(dir, filename, File::O_RDONLY))
+    {
+        printf("File not found\n");
+        return;
+    }
+
+    // Parse BMP header
+    if (read16(bmpFile) == 0x4D42)
+    { // BMP signature
+        printf("File size: %d\n", read32(bmpFile));
+        (void) read32(bmpFile);           // Read & ignore creator bytes
+        bmpImageoffset = read32(bmpFile); // Start of image data
+        printf("Image Offset: %d\n", bmpImageoffset);
+        // Read DIB header
+        printf("Header size: %d\n", read32(bmpFile));
+        bmpWidth = read32(bmpFile);
+        bmpHeight = read32(bmpFile);
+        if (read16(bmpFile) == 1)
+        {                               // # planes -- must be '1'
+            bmpDepth = read16(bmpFile); // bits per pixel
+            printf("Bit depth: %d\n", bmpDepth);
+            if ((bmpDepth == 24) && (read32(bmpFile) == 0))
+            { // 0 = uncompressed
+
+                goodBmp = true; // Supported BMP format -- proceed!
+                printf("Image size: %d x %d\n", bmpWidth, bmpHeight);
+
+                // BMP rows are padded (if needed) to 4-byte boundary
+                rowSize = (bmpWidth * 3 + 3) & ~3;
+
+                // If bmpHeight is negative, image is in top-down order.
+                // This is not canon but has been observed in the wild.
+                if (bmpHeight < 0)
+                {
+                    bmpHeight = -bmpHeight;
+                    flip = false;
+                }
+
+                // Crop area to be loaded
+                w = bmpWidth;
+                h = bmpHeight;
+                if ((x + w - 1) >= TFT_WIDTH)
+                    w = TFT_WIDTH - x;
+                if ((y + h - 1) >= TFT_HEIGHT)
+                    h = TFT_HEIGHT - y;
+
+                // Set TFT address window to clipped image bounds
+
+                for (row = 0; row < h; row++)
+                { // For each scanline...
+
+                    // Seek to start of scan line.  It might seem labor-
+                    // intensive to be doing this on every line, but this
+                    // method covers a lot of gritty details like cropping
+                    // and scanline padding.  Also, the seek only takes
+                    // place if the file position actually needs to change
+                    // (avoids a lot of cluster math in SD library).
+                    if (flip) // Bitmap is stored bottom-to-top order (normal BMP)
+                        pos = bmpImageoffset + (bmpHeight - 1 - row) * rowSize;
+                    else // Bitmap is stored top-to-bottom
+                        pos = bmpImageoffset + row * rowSize;
+                    if (bmpFile.get_current_position() != pos)
+                    { // Need seek?
+                        bmpFile.seek(pos);
+                        buffidx = sizeof(sdbuffer); // Force buffer reload
+                    }
+
+                    for (col = 0; col < w; col++)
+                    { // For each pixel...
+                        // Time to read more pixel data?
+                        if (buffidx >= sizeof(sdbuffer))
+                        { // Indeed
+                            bmpFile.read(sdbuffer, sizeof(sdbuffer));
+                            buffidx = 0; // Set index to beginning
+                        }
+
+                        // Convert pixel from BMP to TFT format, push to display
+                        b = sdbuffer[buffidx++];
+                        g = sdbuffer[buffidx++];
+                        r = sdbuffer[buffidx++];
+                        // printf("c1: %d, c2: %d, c3: %d\n", r, g, b);
+                        uint16_t color565 = (r & 0xFC) << 8 | (g & 0xFC) << 3 | b >> 3;
+                        // printf("color: %02X\n", color565);
+                        ILI9341_DrawPixel(col, row, color565);
+                    } // end pixel
+                }     // end scanline
+            } // end goodBmp
+        }
+    }
+
+    bmpFile.close();
+    if (!goodBmp)
+        printf("BMP format not recognized.\n");
+}
+
+// These read 16- and 32-bit types from the SD card file.
+// BMP data is stored little-endian, Arduino is little-endian too.
+// May need to reverse subscript order if porting elsewhere.
+
+uint16_t read16(File &f)
+{
+    uint16_t result;
+    ((uint8_t*) &result)[0] = f.read(); // LSB
+    ((uint8_t*) &result)[1] = f.read(); // MSB
+    return result;
+}
+
+uint32_t read32(File &f)
+{
+    uint32_t result;
+    ((uint8_t*) &result)[0] = f.read(); // LSB
+    ((uint8_t*) &result)[1] = f.read();
+    ((uint8_t*) &result)[2] = f.read();
+    ((uint8_t*) &result)[3] = f.read(); // MSB
+    return result;
 }

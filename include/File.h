@@ -111,6 +111,9 @@ public:
 
     int print(const char* format, ...);
     size_t write(const uint8_t *buffer, uint16_t size);
+    bool seek(uint32_t pos) {
+        return seek_set(pos);
+    }
 
     bool rm();
 

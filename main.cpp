@@ -28,6 +28,7 @@
  */
 #include <FAT.h>
 #include <File.h>
+#include <ImgFolder.h>
 #include <SDCard.h>
 #include <SPI.h>
 #include <avr/io.h>
@@ -40,6 +41,12 @@ extern "C"
 
 #define TFT_WIDTH  ILI9341_MAX_X
 #define TFT_HEIGHT ILI9341_MAX_Y
+
+#define IMG_CTRL_PORT PORTA
+#define IMG_CTRL_PIN PINA
+#define IMG_CTRL_DDR DDRA
+#define IMG_NEXT 0
+#define IMG_PREV 1
 
 SDCard disk(&PORTB, &DDRB, PB4);
 FAT fs(&disk);
@@ -71,8 +78,9 @@ void handle_error()
     }
 }
 void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y);
-uint32_t read32(File &f);
-uint16_t read16(File &f);
+void bmpDraw(File& bmpFile, uint8_t x, uint8_t y);
+uint32_t read32(File& f);
+uint16_t read16(File& f);
 
 int main()
 {
@@ -87,23 +95,10 @@ int main()
         printf("Card initialization failed.\n");
         handle_error();
     }
-    SPI::set_speed(); // Max speed for now
+    SPI::set_speed();
 
-    // init lcd
     ILI9341_Init();
-
-    // clear Screen
     ILI9341_ClearScreen(ILI9341_BLACK);
-
-    // // draw horizontal fast line
-    // ILI9341_DrawLineHorizontal(10, ILI9341_MAX_X - 10, 12, ILI9341_WHITE);
-    // // draw horizontal fast line
-    // ILI9341_DrawLineHorizontal(10, ILI9341_MAX_X - 10, 50, ILI9341_WHITE);
-
-    // // set position
-    // ILI9341_SetPosition(11, 25);
-    // // draw string
-    // ILI9341_DrawString("ILI9341 LCD DRIVER", ILI9341_RED, X3);
 
     printf("\nMounting FAT Filesystem...\n");
     if (fs.mount())
@@ -126,29 +121,61 @@ int main()
         printf("Unable to open root\n");
         handle_error();
     }
+    File imgDir(&fs);
+    if (!imgDir.open(root, "img", File::O_RDONLY))
+    {
+        printf("Unable to open img folder\n");
+        handle_error();
+    }
 
-    bmpDraw(root, "img2.bmp", 0, 0);
+    ImgFolder imgFolder(imgDir);
+    imgFolder.first_file(file);
+    bool imgChanged = true;
+    // PA0 = next image, PA1 = prev image, set as input with pullup
+    IMG_CTRL_DDR &= ~(_BV(IMG_NEXT) | _BV(IMG_PREV));
+    IMG_CTRL_PORT |= _BV(IMG_NEXT) | _BV(IMG_PREV);
+    while (1)
+    {
+        if (!(IMG_CTRL_PIN & _BV(IMG_NEXT)))
+        {
+            if (!imgFolder.next_file(file))
+            {
+                printf("Unable to open next file\n");
+            }
+            else
+            {
+                imgChanged = true;
+            }
+        }
+
+        if (!(IMG_CTRL_PIN & _BV(IMG_PREV)))
+        {
+            if (!imgFolder.prev_file(file))
+            {
+                printf("Unable to open prev file\n");
+            }
+            else
+            {
+                imgChanged = true;
+            }
+        }
+        if (imgChanged)
+        {
+            ILI9341_ClearScreen(ILI9341_BLACK);
+            bmpDraw(file, 0, 0);
+            imgChanged = false;
+        }
+        _delay_ms(50);
+    }
 
     return 0;
 }
 
-#define BUFFPIXEL 40
+#define BUFFPIXEL 60
 
 void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y)
 {
     File bmpFile(&fs);
-    int bmpWidth, bmpHeight;            // W+H in pixels
-    uint8_t bmpDepth;                   // Bit depth (currently must be 24)
-    uint32_t bmpImageoffset;            // Start of image data in file
-    uint32_t rowSize;                   // Not always = bmpWidth; may have padding
-    uint8_t sdbuffer[3 * BUFFPIXEL];    // pixel buffer (R+G+B per pixel)
-    uint8_t buffidx = sizeof(sdbuffer); // Current position in sdbuffer
-    bool goodBmp = false;               // Set to true on valid header parse
-    bool flip = true;                   // BMP is stored bottom-to-top
-    int w, h, row, col;
-    uint8_t r, g, b;
-    uint32_t pos = 0;
-
     if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))
         return;
 
@@ -160,6 +187,24 @@ void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y)
         printf("File not found\n");
         return;
     }
+}
+
+void bmpDraw(File& bmpFile, uint8_t x, uint8_t y)
+{
+    if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))
+        return;
+
+    int bmpWidth, bmpHeight;            // W+H in pixels
+    uint8_t bmpDepth;                   // Bit depth (currently must be 24)
+    uint32_t bmpImageoffset;            // Start of image data in file
+    uint32_t rowSize;                   // Not always = bmpWidth; may have padding
+    uint8_t sdbuffer[3 * BUFFPIXEL];    // pixel buffer (R+G+B per pixel)
+    uint8_t buffidx = sizeof(sdbuffer); // Current position in sdbuffer
+    bool goodBmp = false;               // Set to true on valid header parse
+    bool flip = true;                   // BMP is stored bottom-to-top
+    int w, h, row, col;
+    uint8_t r, g, b;
+    uint32_t pos = 0;
 
     // Parse BMP header
     if (read16(bmpFile) == 0x4D42)
@@ -236,12 +281,12 @@ void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y)
                         g = sdbuffer[buffidx++];
                         r = sdbuffer[buffidx++];
                         // printf("c1: %d, c2: %d, c3: %d\n", r, g, b);
-                        uint16_t color565 = (r & 0xFC) << 8 | (g & 0xFC) << 3 | b >> 3;
+                        uint16_t color565 = (r & 0xF8) << 8 | (g & 0xFC) << 3 | b >> 3;
                         // printf("color: %02X\n", color565);
                         ILI9341_DrawPixel(col, row, color565);
                     } // end pixel
                 }     // end scanline
-            } // end goodBmp
+            }         // end goodBmp
         }
     }
 
@@ -254,7 +299,7 @@ void bmpDraw(File& dir, char* filename, uint8_t x, uint16_t y)
 // BMP data is stored little-endian, Arduino is little-endian too.
 // May need to reverse subscript order if porting elsewhere.
 
-uint16_t read16(File &f)
+uint16_t read16(File& f)
 {
     uint16_t result;
     ((uint8_t*) &result)[0] = f.read(); // LSB
@@ -262,7 +307,7 @@ uint16_t read16(File &f)
     return result;
 }
 
-uint32_t read32(File &f)
+uint32_t read32(File& f)
 {
     uint32_t result;
     ((uint8_t*) &result)[0] = f.read(); // LSB

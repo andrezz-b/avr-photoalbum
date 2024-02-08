@@ -36,7 +36,7 @@
 #include <util/delay.h>
 extern "C"
 {
-#include "lib/ili9341.h"
+#include <ili9341.h>
 }
 
 #define TFT_WIDTH  ILI9341_MAX_X

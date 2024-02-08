@@ -240,6 +240,24 @@ int16_t File::read(uint8_t *buffer, uint16_t size)
     return size;
 }
 
+uint16_t File::read16(File& f)
+{
+    uint16_t result;
+    ((uint8_t*) &result)[0] = f.read(); // LSB
+    ((uint8_t*) &result)[1] = f.read(); // MSB
+    return result;
+}
+
+uint32_t File::read32(File& f)
+{
+    uint32_t result;
+    ((uint8_t*) &result)[0] = f.read(); // LSB
+    ((uint8_t*) &result)[1] = f.read();
+    ((uint8_t*) &result)[2] = f.read();
+    ((uint8_t*) &result)[3] = f.read(); // MSB
+    return result;
+}
+
 uint8_t File::is_unbuffered_read()
 {
     return flags & Flags::F_FILE_UNBUFFERED_READ;

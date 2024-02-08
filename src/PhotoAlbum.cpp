@@ -69,7 +69,7 @@ void PhotoAlbum::init()
 void PhotoAlbum::listen_for_input()
 {
     image_changed = false;
-    if (!(IMG_CTRL_PIN & _BV(IMG_NEXT)))
+    if (button_pressed(IMG_NEXT))
     {
         if (!imgFolder.next_file(current_file))
         {
@@ -81,7 +81,7 @@ void PhotoAlbum::listen_for_input()
         }
     }
 
-    if (!(IMG_CTRL_PIN & _BV(IMG_PREV)))
+    if (button_pressed(IMG_PREV))
     {
         if (!imgFolder.prev_file(current_file))
         {
@@ -104,22 +104,63 @@ void PhotoAlbum::draw_image()
     bmp_draw(current_file, 0, 0);
 }
 
-uint16_t read16(File& f)
+bool PhotoAlbum::button_pressed(uint8_t button_pin)
 {
-    uint16_t result;
-    ((uint8_t*) &result)[0] = f.read(); // LSB
-    ((uint8_t*) &result)[1] = f.read(); // MSB
-    return result;
+    return !(IMG_CTRL_PIN & _BV(button_pin));
 }
 
-uint32_t read32(File& f)
+typedef struct
 {
-    uint32_t result;
-    ((uint8_t*) &result)[0] = f.read(); // LSB
-    ((uint8_t*) &result)[1] = f.read();
-    ((uint8_t*) &result)[2] = f.read();
-    ((uint8_t*) &result)[3] = f.read(); // MSB
-    return result;
+    int32_t width;
+    int32_t height;
+    uint32_t data_offset;
+} BMPHeader;
+
+bool parse_bmp_header(File& bmp_file, BMPHeader& header)
+{
+    // BMP Signature
+    if (File::read16(bmp_file) != 0x4D42)
+    {
+        return false;
+    }
+
+    // File size
+    File::read32(bmp_file);
+
+    // Read & ignore creator bytes
+    File::read32(bmp_file);
+
+    // Offset to start of image data
+    header.data_offset = File::read32(bmp_file);
+
+    // Header Size
+    File::read32(bmp_file);
+
+    // Width
+    header.width = File::read32(bmp_file);
+
+    // Height
+    header.height = File::read32(bmp_file);
+
+    // Number of planes - must be 1
+    if (File::read16(bmp_file) != 1)
+    {
+        return false;
+    }
+
+    // Depth - Bits per pixel - only 24 supported
+    if (File::read16(bmp_file) != 24)
+    {
+        return false;
+    }
+
+    // Compression - must be uncompressed (0)
+    if (File::read32(bmp_file) != 0)
+    {
+        return false;
+    }
+
+    return true;
 }
 
 void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
@@ -127,101 +168,79 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
     if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))
         return;
 
-    int bmpWidth, bmpHeight;            // W+H in pixels
-    uint8_t bmpDepth;                   // Bit depth (currently must be 24)
-    uint32_t bmpImageoffset;            // Start of image data in file
-    uint32_t rowSize;                   // Not always = bmpWidth; may have padding
-    uint8_t sdbuffer[3 * BUFFPIXEL];    // pixel buffer (R+G+B per pixel)
-    uint8_t buffidx = sizeof(sdbuffer); // Current position in sdbuffer
-    bool goodBmp = false;               // Set to true on valid header parse
-    bool flip = true;                   // BMP is stored bottom-to-top
+    BMPHeader header;
+    uint32_t rowSize;                    // Not always = bmpWidth; may have padding
+    uint8_t sdbuffer[3 * BUFFPIXEL];     // pixel buffer (R+G+B per pixel)
+    uint16_t buffidx = sizeof(sdbuffer); // Current position in sdbuffer
+    bool flip = true;                    // BMP is stored bottom-to-top
     int w, h, row, col;
     uint8_t r, g, b;
     uint32_t pos = 0;
 
-    // Parse BMP header
-    if (read16(bmpFile) == 0x4D42)
-    { // BMP signature
-        DEBUG("File size: %d\n", read32(bmpFile));
-        (void) read32(bmpFile);           // Read & ignore creator bytes
-        bmpImageoffset = read32(bmpFile); // Start of image data
-        DEBUG("Image Offset: %d\n", bmpImageoffset);
-        // Read DIB header
-        DEBUG("Header size: %d\n", read32(bmpFile));
-        bmpWidth = read32(bmpFile);
-        bmpHeight = read32(bmpFile);
-        if (read16(bmpFile) == 1)
-        {                               // # planes -- must be '1'
-            bmpDepth = read16(bmpFile); // bits per pixel
-            DEBUG("Bit depth: %d\n", bmpDepth);
-            if ((bmpDepth == 24) && (read32(bmpFile) == 0))
-            { // 0 = uncompressed
-
-                goodBmp = true; // Supported BMP format -- proceed!
-                DEBUG("Image size: %d x %d\n", bmpWidth, bmpHeight);
-
-                // BMP rows are padded (if needed) to 4-byte boundary
-                rowSize = (bmpWidth * 3 + 3) & ~3;
-
-                // If bmpHeight is negative, image is in top-down order.
-                // This is not canon but has been observed in the wild.
-                if (bmpHeight < 0)
-                {
-                    bmpHeight = -bmpHeight;
-                    flip = false;
-                }
-
-                // Crop area to be loaded
-                w = bmpWidth;
-                h = bmpHeight;
-                if ((x + w - 1) >= TFT_WIDTH)
-                    w = TFT_WIDTH - x;
-                if ((y + h - 1) >= TFT_HEIGHT)
-                    h = TFT_HEIGHT - y;
-
-                // Set TFT address window to clipped image bounds
-
-                for (row = 0; row < h; row++)
-                { // For each scanline...
-
-                    // Seek to start of scan line.  It might seem labor-
-                    // intensive to be doing this on every line, but this
-                    // method covers a lot of gritty details like cropping
-                    // and scanline padding.  Also, the seek only takes
-                    // place if the file position actually needs to change
-                    // (avoids a lot of cluster math in SD library).
-                    if (flip) // Bitmap is stored bottom-to-top order (normal BMP)
-                        pos = bmpImageoffset + (bmpHeight - 1 - row) * rowSize;
-                    else // Bitmap is stored top-to-bottom
-                        pos = bmpImageoffset + row * rowSize;
-                    if (bmpFile.get_current_position() != pos)
-                    { // Need seek?
-                        bmpFile.seek(pos);
-                        buffidx = sizeof(sdbuffer); // Force buffer reload
-                    }
-
-                    for (col = 0; col < w; col++)
-                    { // For each pixel...
-                        // Time to read more pixel data?
-                        if (buffidx >= sizeof(sdbuffer))
-                        { // Indeed
-                            bmpFile.read(sdbuffer, sizeof(sdbuffer));
-                            buffidx = 0; // Set index to beginning
-                        }
-
-                        // Convert pixel from BMP to TFT format, push to display
-                        b = sdbuffer[buffidx++];
-                        g = sdbuffer[buffidx++];
-                        r = sdbuffer[buffidx++];
-                        uint16_t color565 = (r & 0xF8) << 8 | (g & 0xFC) << 3 | b >> 3;
-                        ILI9341_DrawPixel(col, row, color565);
-                    } // end pixel
-                }     // end scanline
-            }         // end goodBmp
-        }
+    if (!parse_bmp_header(bmpFile, header))
+    {
+        DEBUG("Invalid BMP file\n");
+        return;
     }
 
+    // BMP rows are padded (if needed) to 4-byte boundary
+    rowSize = (header.width * 3 + 3) & ~3;
+
+    // If bmpHeight is negative, image is in top-down order.
+    // This is not canon but has been observed in the wild.
+    if (header.height < 0)
+    {
+        header.height = -header.height;
+        flip = false;
+    }
+
+    // Crop area to be loaded
+    w = header.width;
+    h = header.height;
+    if ((x + w - 1) >= TFT_WIDTH)
+        w = TFT_WIDTH - x;
+    if ((y + h - 1) >= TFT_HEIGHT)
+        h = TFT_HEIGHT - y;
+
+    for (row = 0; row < h; row++)
+    { // For each scanline...
+
+        // Seek to start of scan line.  It might seem labor-
+        // intensive to be doing this on every line, but this
+        // method covers a lot of gritty details like cropping
+        // and scanline padding.  Also, the seek only takes
+        // place if the file position actually needs to change
+        // (avoids a lot of cluster math in SD library).
+        if (flip) // Bitmap is stored bottom-to-top order (normal BMP)
+            pos = header.data_offset + (header.height - 1 - row) * rowSize;
+        else // Bitmap is stored top-to-bottom
+            pos = header.data_offset + row * rowSize;
+        if (bmpFile.get_current_position() != pos)
+        { // Need seek?
+            bmpFile.seek(pos);
+            buffidx = sizeof(sdbuffer); // Force buffer reload
+        }
+
+        for (col = 0; col < w; col++)
+        { // For each pixel...
+            // Time to read more pixel data?
+            if (buffidx >= sizeof(sdbuffer))
+            { // Indeed
+                bmpFile.read(sdbuffer, sizeof(sdbuffer));
+                buffidx = 0; // Set index to beginning
+            }
+
+            // Convert pixel from BMP to TFT format, push to display
+            b = sdbuffer[buffidx++];
+            g = sdbuffer[buffidx++];
+            r = sdbuffer[buffidx++];
+            uint16_t color565 = (r & 0xF8) << 8 | (g & 0xFC) << 3 | b >> 3;
+            ILI9341_DrawPixel(col, row, color565);
+        } // end pixel
+    }     // end scanline
+    // } // end goodBmp
+    //     }
+    // }
+
     bmpFile.close();
-    if (!goodBmp)
-        DEBUG("BMP format not recognized.\n");
 }

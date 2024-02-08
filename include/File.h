@@ -117,6 +117,9 @@ public:
 
     bool rm();
 
+    static uint16_t read16(File& f);
+    static uint32_t read32(File& f);
+
 private:
     FAT *fs;
 

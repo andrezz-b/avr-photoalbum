@@ -4,6 +4,12 @@ ImgFolder::ImgFolder(File& dir) : dir(dir), index(0), max_index(127)
 {
     memset(name_buffer, 0, sizeof(name_buffer));
 }
+
+ImgFolder::~ImgFolder()
+{
+    dir.close();
+}
+
 bool ImgFolder::first_file(File& imgFile)
 {
     index = index - 1;

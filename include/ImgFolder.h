@@ -7,6 +7,7 @@ class ImgFolder
 {
 public:
     ImgFolder(File& dir);
+    ~ImgFolder();
     bool first_file(File& imgFile);
 
     bool next_file(File& imgFile);

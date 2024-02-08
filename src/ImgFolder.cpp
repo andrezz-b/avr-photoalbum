@@ -1,6 +1,6 @@
 #include <ImgFolder.h>
 
-ImgFolder::ImgFolder(File& dir) : dir(dir), index(0), max_index(127)
+ImgFolder::ImgFolder(FAT *fs) : dir(fs), index(0), max_index(127)
 {
     memset(name_buffer, 0, sizeof(name_buffer));
 }
@@ -8,6 +8,11 @@ ImgFolder::ImgFolder(File& dir) : dir(dir), index(0), max_index(127)
 ImgFolder::~ImgFolder()
 {
     dir.close();
+}
+
+void ImgFolder::init(File& root_dir, const char* folder_name)
+{
+    dir.open(root_dir, folder_name, File::O_RDONLY);
 }
 
 bool ImgFolder::first_file(File& imgFile)

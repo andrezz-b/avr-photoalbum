@@ -2,12 +2,14 @@
 #define IMGFOLDER_H_
 
 #include <File.h>
+#include <FAT.h>
 
 class ImgFolder
 {
 public:
-    ImgFolder(File& dir);
+    ImgFolder(FAT *fs);
     ~ImgFolder();
+    void init(File& root_dir, const char* folder_name);
     bool first_file(File& imgFile);
 
     bool next_file(File& imgFile);

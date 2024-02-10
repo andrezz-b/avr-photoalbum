@@ -1,5 +1,6 @@
 #include <PhotoAlbum.h>
 #include <SPI.h>
+#include <stdlib.h>
 #if defined(DEBUG_SERIAL)
 #include <serial.h>
 #endif
@@ -99,14 +100,27 @@ void PhotoAlbum::listen_for_input()
 
 void PhotoAlbum::draw_title_screen()
 {
-    ILI9341_SetPosition(0, 0);
+    ILI9341_SetPosition(80, 144);
     ILI9341_DrawString("URS Fotoalbum", ILI9341_WHITE, ILI9341_Sizes::X1);
+    ILI9341_SetPosition(80, 154);
+    ILI9341_DrawString("Images found: ", ILI9341_WHITE, ILI9341_Sizes::X1);
+    char buffer[3];
+    itoa(imgFolder.get_image_count(), buffer, 10);
+    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
 }
 
 void PhotoAlbum::draw_image()
 {
     ILI9341_ClearScreen(ILI9341_BLACK);
-    bmp_draw(current_file, 0, 0);
+    char buffer[16];
+    imgFolder.get_current_file_name(buffer);
+    strcat(buffer, "  ");
+    ILI9341_SetPosition(5, 311);
+    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    itoa(current_file.get_file_size() >> 10, buffer, 10);
+    strcat(buffer, " KiB");
+    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    bmp_draw(current_file, 0, 10);
 }
 
 bool PhotoAlbum::button_pressed(uint8_t button_pin)
@@ -204,7 +218,7 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
     h = header.height;
     if ((x + w - 1) >= TFT_WIDTH)
         w = TFT_WIDTH - x;
-    if ((y + h - 1) >= TFT_HEIGHT)
+    if ((y + h - 1) >= TFT_HEIGHT - 20)
         h = TFT_HEIGHT - y;
 
     for (row = 0; row < h; row++)

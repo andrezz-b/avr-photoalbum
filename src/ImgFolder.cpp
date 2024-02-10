@@ -1,8 +1,7 @@
 #include <ImgFolder.h>
 
-ImgFolder::ImgFolder(FAT *fs) : dir(fs), index(-1), max_index(INT8_MAX)
+ImgFolder::ImgFolder(FAT* fs) : dir(fs), index(-1), max_index(INT8_MAX), image_count(0)
 {
-    memset(name_buffer, 0, sizeof(name_buffer));
 }
 
 ImgFolder::~ImgFolder()
@@ -13,6 +12,29 @@ ImgFolder::~ImgFolder()
 void ImgFolder::init(File& root_dir, const char* folder_name)
 {
     dir.open(root_dir, folder_name, File::O_RDONLY);
+    uint8_t count = 0;
+    while (dir.ls(name_buffer, File::LS_FILE, count++))
+    {
+        if (strlen(name_buffer) == 0)
+        {
+            break;
+        }
+        if (strcasestr(name_buffer, ".bmp") != NULL)
+        {
+            image_count++;
+        }
+    }
+    max_index = image_count - 1;
+    memset(name_buffer, 0, sizeof(name_buffer));
+}
+
+bool ImgFolder::get_current_file_name(char* buffer)
+{
+    if (index < 0)
+    {
+        return false;
+    }
+    return dir.ls(buffer, File::LS_FILE, index);
 }
 
 bool ImgFolder::next_file(File& imgFile)
@@ -45,7 +67,6 @@ bool ImgFolder::next_file_name(char* buffer)
     if (strlen(buffer) == 0 || strcasestr(buffer, ".bmp") == NULL)
     {
         index = curr_index;
-        max_index = curr_index;
         return false;
     }
     return true;

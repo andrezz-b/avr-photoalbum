@@ -13,12 +13,15 @@ public:
 
     bool next_file(File& imgFile);
     bool prev_file(File& imgFile);
+    uint8_t get_image_count() { return image_count; }
+    bool get_current_file_name(char* buffer);
 
 private:
     File dir;
     int8_t index;
     uint8_t max_index;
     char name_buffer[16];
+    uint8_t image_count;
 
     bool next_file_name(char* buffer);
     bool prev_file_name(char* buffer);

@@ -62,13 +62,11 @@ void PhotoAlbum::init()
     IMG_CTRL_PORT |= _BV(IMG_NEXT) | _BV(IMG_PREV);
 
     imgFolder.init(root_dir, "img");
-    imgFolder.first_file(current_file);
-    draw_image();
+    draw_title_screen();
 }
 
 void PhotoAlbum::listen_for_input()
 {
-    image_changed = false;
     if (button_pressed(IMG_NEXT))
     {
         if (!imgFolder.next_file(current_file))
@@ -95,7 +93,14 @@ void PhotoAlbum::listen_for_input()
     if (image_changed)
     {
         draw_image();
+        image_changed = false;
     }
+}
+
+void PhotoAlbum::draw_title_screen()
+{
+    ILI9341_SetPosition(0, 0);
+    ILI9341_DrawString("URS Fotoalbum", ILI9341_WHITE, ILI9341_Sizes::X1);
 }
 
 void PhotoAlbum::draw_image()

@@ -10,7 +10,6 @@ public:
     ImgFolder(FAT *fs);
     ~ImgFolder();
     void init(File& root_dir, const char* folder_name);
-    bool first_file(File& imgFile);
 
     bool next_file(File& imgFile);
     bool prev_file(File& imgFile);

@@ -41,6 +41,7 @@ public:
 private:
     bool button_pressed(uint8_t button_pin);
     void draw_image();
+    void draw_title_screen();
 
     static void bmp_draw(File& bmpFile, uint8_t x, uint8_t y);
 

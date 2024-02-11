@@ -1,6 +1,12 @@
 #include <ImgFolder.h>
 
-ImgFolder::ImgFolder(FAT* fs) : dir(fs), index(-1), max_index(INT8_MAX), image_count(0)
+ImgFolder::ImgFolder(FAT* fs)
+    : dir(fs), index(-1), max_index(INT8_MAX), image_count(0), loop_on_end(true)
+{
+}
+
+ImgFolder::ImgFolder(FAT* fs, bool loop)
+    : dir(fs), index(-1), max_index(INT8_MAX), image_count(0), loop_on_end(loop)
 {
 }
 
@@ -60,7 +66,12 @@ bool ImgFolder::next_file_name(char* buffer)
 {
     if (index + 1 > max_index)
     {
-        return false;
+        if (loop_on_end)
+        {
+            index = -1;
+        } else {
+            return false;
+        }
     }
     uint8_t curr_index = index;
     dir.ls(buffer, File::LS_FILE, ++index);

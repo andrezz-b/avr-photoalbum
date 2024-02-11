@@ -158,6 +158,9 @@ void PhotoAlbum::draw_ui()
     if (imgFolder.next_available())
     {
         ILI9341_DrawString("Next -->", ILI9341_WHITE, ILI9341_Sizes::X1);
+    } else if (imgFolder.is_looping())
+    {
+        ILI9341_DrawString("Start -->", ILI9341_WHITE, ILI9341_Sizes::X1);
     }
 }
 

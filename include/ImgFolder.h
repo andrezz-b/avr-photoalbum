@@ -8,6 +8,7 @@ class ImgFolder
 {
 public:
     ImgFolder(FAT *fs);
+    ImgFolder(FAT *fs, bool loop);
     ~ImgFolder();
     void init(File& root_dir, const char* folder_name);
 
@@ -18,6 +19,7 @@ public:
     bool next_available() { return index < max_index; }
     bool prev_available() { return index > 0; }
     int8_t get_index() { return index; }
+    bool is_looping() { return loop_on_end; }
 
 private:
     File dir;
@@ -25,6 +27,7 @@ private:
     uint8_t max_index;
     char name_buffer[16];
     uint8_t image_count;
+    bool loop_on_end;
 
     bool next_file_name(char* buffer);
     bool prev_file_name(char* buffer);

@@ -100,26 +100,60 @@ void PhotoAlbum::listen_for_input()
 
 void PhotoAlbum::draw_title_screen()
 {
-    ILI9341_SetPosition(80, 144);
-    ILI9341_DrawString("URS Fotoalbum", ILI9341_WHITE, ILI9341_Sizes::X1);
-    ILI9341_SetPosition(80, 154);
+    ILI9341_SetPosition(55, 94);
+    ILI9341_DrawString("URS Fotoalbum", ILI9341_WHITE, ILI9341_Sizes::X3);
+    ILI9341_SetPosition(70, 134);
     ILI9341_DrawString("Images found: ", ILI9341_WHITE, ILI9341_Sizes::X1);
     char buffer[3];
     itoa(imgFolder.get_image_count(), buffer, 10);
     ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    ILI9341_SetPosition(70, 154);
+    ILI9341_DrawString("Controls: ", ILI9341_WHITE, ILI9341_Sizes::X1);
+    ILI9341_SetPosition(75, 164);
+    ILI9341_DrawString("--> Next", ILI9341_WHITE, ILI9341_Sizes::X1);
+    ILI9341_SetPosition(75, 174);
+    ILI9341_DrawString("<-- Prev", ILI9341_WHITE, ILI9341_Sizes::X1);
+    ILI9341_SetPosition(70, 204);
+    ILI9341_DrawString("Press --> to start", ILI9341_WHITE, ILI9341_Sizes::X1);
 }
 
 void PhotoAlbum::draw_image()
 {
     ILI9341_ClearScreen(ILI9341_BLACK);
+    // Top UI bar - Image name and size
+    // Name
     char buffer[16];
     imgFolder.get_current_file_name(buffer);
     strcat(buffer, "  ");
-    ILI9341_SetPosition(5, 311);
+    ILI9341_SetPosition(10, 1);
     ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    // Images
+    ILI9341_SetPosition(110, 1);
+    itoa(imgFolder.get_index() + 1, buffer, 10);
+    strcat(buffer, "/");
+    itoa(imgFolder.get_image_count(), buffer + strlen(buffer), 10);
+    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    // Size
+    ILI9341_SetPosition(180, 1);
     itoa(current_file.get_file_size() >> 10, buffer, 10);
     strcat(buffer, " KiB");
     ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    // Bottom UI bar - Controls
+    // Prev
+    if (imgFolder.prev_available())
+    {
+        ILI9341_SetPosition(50, 311);
+        ILI9341_DrawString("<-- Prev", ILI9341_WHITE, ILI9341_Sizes::X1);
+    }
+    // Split
+    ILI9341_SetPosition(95, 311);
+    ILI9341_DrawString("   |   ", ILI9341_WHITE, ILI9341_Sizes::X1);
+    // Next
+    if (imgFolder.next_available())
+    {
+        ILI9341_DrawString("Next -->", ILI9341_WHITE, ILI9341_Sizes::X1);
+    }
+
     bmp_draw(current_file, 0, 10);
 }
 
@@ -219,7 +253,7 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
     if ((x + w - 1) >= TFT_WIDTH)
         w = TFT_WIDTH - x;
     if ((y + h - 1) >= TFT_HEIGHT - 20)
-        h = TFT_HEIGHT - y;
+        h = TFT_HEIGHT - 10 - y;
 
     for (row = 0; row < h; row++)
     { // For each scanline...
@@ -254,7 +288,7 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
             g = sdbuffer[buffidx++];
             r = sdbuffer[buffidx++];
             uint16_t color565 = (r & 0xF8) << 8 | (g & 0xFC) << 3 | b >> 3;
-            ILI9341_DrawPixel(col, row, color565);
+            ILI9341_DrawPixel(col + x, row + y, color565);
         } // end pixel
     }     // end scanline
     // } // end goodBmp

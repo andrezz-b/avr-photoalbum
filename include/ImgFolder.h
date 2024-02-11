@@ -15,6 +15,9 @@ public:
     bool prev_file(File& imgFile);
     uint8_t get_image_count() { return image_count; }
     bool get_current_file_name(char* buffer);
+    bool next_available() { return index < max_index; }
+    bool prev_available() { return index > 0; }
+    int8_t get_index() { return index; }
 
 private:
     File dir;

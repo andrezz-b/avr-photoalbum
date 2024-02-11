@@ -29,6 +29,13 @@ extern "C"
 #define DEBUG(...)
 #endif
 
+typedef struct
+{
+    int32_t width;
+    int32_t height;
+    uint32_t data_offset;
+} BMPHeader;
+
 class PhotoAlbum
 {
 public:
@@ -41,9 +48,11 @@ public:
 private:
     bool button_pressed(uint8_t button_pin);
     void draw_image();
+    void draw_ui();
     void draw_title_screen();
 
     static void bmp_draw(File& bmpFile, uint8_t x, uint8_t y);
+    static bool parse_bmp_header(File&, BMPHeader&);
 
     SDCard disk;
     FAT fs;

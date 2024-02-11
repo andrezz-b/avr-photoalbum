@@ -120,6 +120,12 @@ void PhotoAlbum::draw_title_screen()
 void PhotoAlbum::draw_image()
 {
     ILI9341_ClearScreen(ILI9341_BLACK);
+    draw_ui();
+    bmp_draw(current_file, 0, 10);
+}
+
+void PhotoAlbum::draw_ui()
+{
     // Top UI bar - Image name and size
     // Name
     char buffer[16];
@@ -127,7 +133,7 @@ void PhotoAlbum::draw_image()
     strcat(buffer, "  ");
     ILI9341_SetPosition(10, 1);
     ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
-    // Images
+    // Images in folder - x/y
     ILI9341_SetPosition(110, 1);
     itoa(imgFolder.get_index() + 1, buffer, 10);
     strcat(buffer, "/");
@@ -153,8 +159,6 @@ void PhotoAlbum::draw_image()
     {
         ILI9341_DrawString("Next -->", ILI9341_WHITE, ILI9341_Sizes::X1);
     }
-
-    bmp_draw(current_file, 0, 10);
 }
 
 bool PhotoAlbum::button_pressed(uint8_t button_pin)
@@ -162,14 +166,7 @@ bool PhotoAlbum::button_pressed(uint8_t button_pin)
     return !(IMG_CTRL_PIN & _BV(button_pin));
 }
 
-typedef struct
-{
-    int32_t width;
-    int32_t height;
-    uint32_t data_offset;
-} BMPHeader;
-
-bool parse_bmp_header(File& bmp_file, BMPHeader& header)
+bool PhotoAlbum::parse_bmp_header(File& bmp_file, BMPHeader& header)
 {
     // BMP Signature
     if (File::read16(bmp_file) != 0x4D42)

@@ -28,6 +28,7 @@
  */
 
 #include <SDCard.h>
+#include <config.h>
 
 SDCard::SDCard(volatile uint8_t *PORT_CS, volatile uint8_t *DDR_CS, uint8_t PIN_CS)
 {
@@ -61,7 +62,7 @@ bool SDCard::init()
 #elif defined(__AVR_ATmega328P__)
     SPI::init(&DDRB, &DDRB, &DDRB, &DDRB, PB2, PB5, PB3, PB4, &PORTB);
 #elif defined(__AVR_ATmega32__)
-    SPI::init(&DDRB, &DDRB, &DDRB, &DDRB, PB4, PB7, PB5, PB6, &PORTB);
+    SPI::init(&SPI_DDR, &SPI_DDR, &SPI_DDR, &SPI_DDR, SPI_SS, SPI_SCK, SPI_MOSI, SPI_MISO, &SPI_PORT);
 #else
     #error "Not compatible. Please add this AVR to the SDCard.cpp init function"
 #endif

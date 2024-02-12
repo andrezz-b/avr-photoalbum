@@ -1,6 +1,10 @@
 #include <PhotoAlbum.h>
 #include <SPI.h>
 #include <stdlib.h>
+extern "C"
+{
+#include <ili9341.h>
+}
 #if defined(DEBUG_SERIAL)
 #include <serial.h>
 #endif
@@ -158,7 +162,8 @@ void PhotoAlbum::draw_ui()
     if (imgFolder.next_available())
     {
         ILI9341_DrawString("Next -->", ILI9341_WHITE, ILI9341_Sizes::X1);
-    } else if (imgFolder.is_looping())
+    }
+    else if (imgFolder.is_looping())
     {
         ILI9341_DrawString("Start -->", ILI9341_WHITE, ILI9341_Sizes::X1);
     }
@@ -235,6 +240,7 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
         DEBUG("Invalid BMP file\n");
         return;
     }
+    DEBUG("Valid BMP file\n");
 
     // BMP rows are padded (if needed) to 4-byte boundary
     rowSize = (header.width * 3 + 3) & ~3;
@@ -254,6 +260,11 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
         w = TFT_WIDTH - x;
     if ((y + h - 1) >= TFT_HEIGHT - 20)
         h = TFT_HEIGHT - 10 - y;
+
+    // If the image is smaller than the screen
+    // center vertically and horizontally
+    x += (TFT_WIDTH - w) / 2;
+    y += (TFT_HEIGHT - 20 - h) / 2;
 
     for (row = 0; row < h; row++)
     { // For each scanline...

@@ -6,28 +6,7 @@
 #include <ImgFolder.h>
 #include <SDCard.h>
 #include <avr/io.h>
-extern "C"
-{
-#include <ili9341.h>
-}
-
-#define TFT_WIDTH  ILI9341_MAX_X
-#define TFT_HEIGHT ILI9341_MAX_Y
-#define BUFFPIXEL  240
-
-#define IMG_CTRL_PORT PORTA
-#define IMG_CTRL_PIN  PINA
-#define IMG_CTRL_DDR  DDRA
-#define IMG_NEXT      0
-#define IMG_PREV      1
-
-#define DEBUG_SERIAL
-
-#if defined(DEBUG_SERIAL)
-#define DEBUG(...) printf(__VA_ARGS__)
-#else
-#define DEBUG(...)
-#endif
+#include <config.h>
 
 typedef struct
 {

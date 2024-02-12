@@ -25,3 +25,8 @@ yarn.lock
 
 # Ignore editor backup files
 *~
+
+# Ignore generated docs
+/docs/*
+!docs/Doxyfile
+

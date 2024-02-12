@@ -4,9 +4,17 @@
  *
  * This file contains various configuration options and macros used in the project.
  */
+
 #ifndef CONFIG_H
 #define CONFIG_H
 
+/**
+ * @def DEBUG_SERIAL
+ * @brief Macro for enabling debug output via serial communication.
+ *
+ * Uncomment this line to enable debug output via serial communication.
+ * When enabled, the DEBUG macro will print debug messages using printf.
+ */
 // #define DEBUG_SERIAL
 
 #if defined(DEBUG_SERIAL)
@@ -39,11 +47,11 @@
  *
  * @{
  */
-#define IMG_CTRL_PORT PORTA // Joystick port register
-#define IMG_CTRL_PIN  PINA  // Joystick pin register
-#define IMG_CTRL_DDR  DDRA  // Joystick ddr register
-#define IMG_NEXT      0     // Joystick pin for the next image
-#define IMG_PREV      1     // Joystick pin for the previous image
+#define IMG_CTRL_PORT PORTA /**< Joystick port register */
+#define IMG_CTRL_PIN  PINA  /**< Joystick pin register */
+#define IMG_CTRL_DDR  DDRA  /**< Joystick ddr register */
+#define IMG_NEXT      0     /**< Joystick pin for the next image */
+#define IMG_PREV      1     /**< Joystick pin for the previous image */
 /** @}*/
 
 #endif // CONFIG_H

@@ -1,3 +1,11 @@
+/**
+ * @file PhotoAlbum.cpp
+ * @brief The main class that runs the project.
+ *
+ * This file contains the implementation of the PhotoAlbum class, which represents a photo album
+ * application. It includes functions for initializing the album, listening for user input, drawing
+ * images on the display, and handling BMP files.
+ */
 #include <PhotoAlbum.h>
 #include <SPI.h>
 #include <stdlib.h>
@@ -8,6 +16,14 @@ extern "C"
 #if defined(DEBUG_SERIAL)
 #include <serial.h>
 #endif
+/**
+ * @brief Constructs a new instance of the PhotoAlbum class.
+ *
+ * @details This constructor initializes the PhotoAlbum object by setting up the necessary
+ * components such as the disk, file system, root directory, current file, image_changed flag, and
+ * image folder.
+ *
+ */
 PhotoAlbum::PhotoAlbum()
     : disk(&PORTB, &DDRB, PB4),
       fs(&disk),
@@ -22,6 +38,12 @@ PhotoAlbum::~PhotoAlbum()
 {
 }
 
+/**
+ * @brief Initializes the PhotoAlbum object.
+ * @details This function performs the necessary initialization steps for the PhotoAlbum object,
+ * including initializing the SD card, mounting the FAT filesystem, opening the filesystem root,
+ * and initializing the image folder.
+ */
 void PhotoAlbum::init()
 {
 #if defined(DEBUG_SERIAL)
@@ -70,6 +92,13 @@ void PhotoAlbum::init()
     draw_title_screen();
 }
 
+/**
+ * @brief Listens for input from buttons and performs actions accordingly.
+ *
+ * @details If the next image button is pressed, it attempts to open the next file in the image
+ * folder. If the previous image button is pressed, it attempts to open the previous file in the
+ * image folder. If the image has changed, it redraws the image on the display.
+ */
 void PhotoAlbum::listen_for_input()
 {
     if (button_pressed(IMG_NEXT))
@@ -102,6 +131,15 @@ void PhotoAlbum::listen_for_input()
     }
 }
 
+/**
+ * @brief Draws the title screen of the photo album.
+ *
+ * @details This function sets the position on the display and draws various strings to create the
+ * title screen of the photo album. It displays the album title, the number of images found, and the
+ * controls for navigating through the album.
+ *
+ * @note This function assumes that the display has been initialized and is ready for drawing.
+ */
 void PhotoAlbum::draw_title_screen()
 {
     ILI9341_SetPosition(55, 94);
@@ -121,6 +159,12 @@ void PhotoAlbum::draw_title_screen()
     ILI9341_DrawString("Press --> to start", ILI9341_WHITE, ILI9341_Sizes::X1);
 }
 
+/**
+ * @brief Draws an image on the screen.
+ *
+ * @details This function clears the screen, draws the user interface, and then draws the specified
+ * image.
+ */
 void PhotoAlbum::draw_image()
 {
     ILI9341_ClearScreen(ILI9341_BLACK);
@@ -128,6 +172,14 @@ void PhotoAlbum::draw_image()
     bmp_draw(current_file, 0, 10);
 }
 
+/**
+ * @brief Draws the user interface for the photo album.
+ *
+ * @details This function draws the top and bottom UI bars for the photo album.
+ * The top UI bar displays the current image name, the number of images in the folder,
+ * and the size of the current image file.
+ * The bottom UI bar displays the previous and next image buttons.
+ */
 void PhotoAlbum::draw_ui()
 {
     // Top UI bar - Image name and size
@@ -169,11 +221,26 @@ void PhotoAlbum::draw_ui()
     }
 }
 
+/**
+ * @brief Checks if a button is pressed.
+ *
+ * @details This function checks the state of a button connected to a specific pin.
+ *
+ * @param button_pin The pin number of the button.
+ * @return true if the button is pressed, false otherwise.
+ */
 bool PhotoAlbum::button_pressed(uint8_t button_pin)
 {
     return !(IMG_CTRL_PIN & _BV(button_pin));
 }
 
+/**
+ * Parses the BMP header of a given file.
+ *
+ * @param bmp_file The file to parse the BMP header from.
+ * @param header The BMPHeader object to store the parsed header information.
+ * @return True if the BMP header was successfully parsed, false otherwise.
+ */
 bool PhotoAlbum::parse_bmp_header(File& bmp_file, BMPHeader& header)
 {
     // BMP Signature
@@ -221,6 +288,18 @@ bool PhotoAlbum::parse_bmp_header(File& bmp_file, BMPHeader& header)
     return true;
 }
 
+/**
+ * @brief Draws a BMP image on the display at the specified coordinates.
+ *
+ * @details This function reads a BMP file from the given File object and draws it on the display
+ * starting from the specified coordinates (x, y). The image is cropped if it exceeds the
+ * display boundaries. The BMP image is converted to the TFT format and each pixel is
+ * drawn on the display.
+ *
+ * @param bmpFile The File object representing the BMP file.
+ * @param x The x-coordinate of the top-left corner of the image on the display.
+ * @param y The y-coordinate of the top-left corner of the image on the display.
+ */
 void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
 {
     if ((x >= TFT_WIDTH) || (y >= TFT_HEIGHT))

@@ -27,7 +27,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include <File.h>
+#include <lib/File.h>
 
 File::File(FAT *fs) : fs(fs)
 {

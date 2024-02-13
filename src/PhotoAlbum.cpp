@@ -6,13 +6,10 @@
  * application. It includes functions for initializing the album, listening for user input, drawing
  * images on the display, and handling BMP files.
  */
+#include <DefaultFonts.h>
 #include <PhotoAlbum.h>
-#include <SPI.h>
+#include <lib/SPI.h>
 #include <stdlib.h>
-extern "C"
-{
-#include <ili9341.h>
-}
 #if defined(DEBUG_SERIAL)
 #include <serial.h>
 #endif
@@ -60,10 +57,9 @@ void PhotoAlbum::init()
     }
     SPI::set_speed();
 
-    /* Display specific code */
-    ILI9341_Init();
-    ILI9341_ClearScreen(ILI9341_BLACK);
-    /* ********************* */
+    display.InitLCD(PORTRAIT);
+    display.setFont(SmallFont);
+    display.clrScr();
 
     DEBUG("\nMounting FAT Filesystem...\n");
     if (fs.mount())
@@ -142,21 +138,15 @@ void PhotoAlbum::listen_for_input()
  */
 void PhotoAlbum::draw_title_screen()
 {
-    ILI9341_SetPosition(55, 94);
-    ILI9341_DrawString("URS Fotoalbum", ILI9341_WHITE, ILI9341_Sizes::X3);
-    ILI9341_SetPosition(70, 134);
-    ILI9341_DrawString("Images found: ", ILI9341_WHITE, ILI9341_Sizes::X1);
-    char buffer[3];
-    itoa(imgFolder.get_image_count(), buffer, 10);
-    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
-    ILI9341_SetPosition(70, 154);
-    ILI9341_DrawString("Controls: ", ILI9341_WHITE, ILI9341_Sizes::X1);
-    ILI9341_SetPosition(75, 164);
-    ILI9341_DrawString("--> Next", ILI9341_WHITE, ILI9341_Sizes::X1);
-    ILI9341_SetPosition(75, 174);
-    ILI9341_DrawString("<-- Prev", ILI9341_WHITE, ILI9341_Sizes::X1);
-    ILI9341_SetPosition(70, 204);
-    ILI9341_DrawString("Press --> to start", ILI9341_WHITE, ILI9341_Sizes::X1);
+    display.setColor(VGA_WHITE);
+    display.print("URS Photoalbum", CENTER, 94);
+    char buffer[20] = "Images found: ";
+    itoa(imgFolder.get_image_count(), buffer + strlen(buffer), 10);
+    display.print(buffer, CENTER, 124);
+    display.print("Controls: ", CENTER, 152);
+    display.print("--> Next", CENTER, 166);
+    display.print("<-- Prev", CENTER, 180);
+    display.print("Press --> to start", CENTER, 210);
 }
 
 /**
@@ -167,9 +157,9 @@ void PhotoAlbum::draw_title_screen()
  */
 void PhotoAlbum::draw_image()
 {
-    ILI9341_ClearScreen(ILI9341_BLACK);
+    display.clrScr();
     draw_ui();
-    bmp_draw(current_file, 0, 10);
+    bmp_draw(current_file, 0, IMG_START_Y);
 }
 
 /**
@@ -182,43 +172,49 @@ void PhotoAlbum::draw_image()
  */
 void PhotoAlbum::draw_ui()
 {
+    display.setColor(VGA_WHITE);
     // Top UI bar - Image name and size
     // Name
-    char buffer[16];
+    char buffer[32];
     imgFolder.get_current_file_name(buffer);
     strcat(buffer, "  ");
-    ILI9341_SetPosition(10, 1);
-    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    display.print(buffer, LEFT, TOP_UI_Y);
     // Images in folder - x/y
-    ILI9341_SetPosition(110, 1);
     itoa(imgFolder.get_index() + 1, buffer, 10);
     strcat(buffer, "/");
     itoa(imgFolder.get_image_count(), buffer + strlen(buffer), 10);
-    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    display.print(buffer, CENTER, TOP_UI_Y);
     // Size
-    ILI9341_SetPosition(180, 1);
     itoa(current_file.get_file_size() >> 10, buffer, 10);
     strcat(buffer, " KiB");
-    ILI9341_DrawString(buffer, ILI9341_WHITE, ILI9341_Sizes::X1);
+    display.print(buffer, RIGHT, TOP_UI_Y);
     // Bottom UI bar - Controls
     // Prev
+    memset(buffer, 0, sizeof(buffer));
     if (imgFolder.prev_available())
     {
-        ILI9341_SetPosition(50, 311);
-        ILI9341_DrawString("<-- Prev", ILI9341_WHITE, ILI9341_Sizes::X1);
+        strcat(buffer, "<-- Prev");
     }
-    // Split
-    ILI9341_SetPosition(95, 311);
-    ILI9341_DrawString("   |   ", ILI9341_WHITE, ILI9341_Sizes::X1);
+    else
+    {
+        strcat(buffer, "        ");
+    }
+    strcat(buffer, "   |   ");
     // Next
     if (imgFolder.next_available())
     {
-        ILI9341_DrawString("Next -->", ILI9341_WHITE, ILI9341_Sizes::X1);
+        strcat(buffer, "Next -->");
     }
     else if (imgFolder.is_looping())
     {
-        ILI9341_DrawString("Start -->", ILI9341_WHITE, ILI9341_Sizes::X1);
+        strcat(buffer, "Start -->");
     }
+    else
+    {
+        strcat(buffer, "        ");
+    }
+
+    display.print(buffer, CENTER, BOTTOM_UI_Y);
 }
 
 /**
@@ -337,13 +333,13 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
     h = header.height;
     if ((x + w - 1) >= TFT_WIDTH)
         w = TFT_WIDTH - x;
-    if ((y + h - 1) >= TFT_HEIGHT - 20)
-        h = TFT_HEIGHT - 10 - y;
+    if ((y + h - 1) >= TFT_HEIGHT - 28)
+        h = TFT_HEIGHT - 14 - y;
 
     // If the image is smaller than the screen
     // center vertically and horizontally
     x += (TFT_WIDTH - w) / 2;
-    y += (TFT_HEIGHT - 20 - h) / 2;
+    y += (TFT_HEIGHT - 28 - h) / 2;
 
     for (row = 0; row < h; row++)
     { // For each scanline...
@@ -377,8 +373,8 @@ void PhotoAlbum::bmp_draw(File& bmpFile, uint8_t x, uint8_t y)
             b = sdbuffer[buffidx++];
             g = sdbuffer[buffidx++];
             r = sdbuffer[buffidx++];
-            uint16_t color565 = (r & 0xF8) << 8 | (g & 0xFC) << 3 | b >> 3;
-            ILI9341_DrawPixel(col + x, row + y, color565);
+            display.setColor(r, g, b);
+            display.drawPixel(col + x, row + y);
         } // end pixel
     }     // end scanline
     // } // end goodBmp

@@ -4,7 +4,7 @@
  * From https://github.com/tuupola/avr_demo/tree/master/blog/simple_usart
  */
 
-#include <serial.h>
+#include <lib/serial.h>
 
 int uart_putchar(char c, FILE *stream) {
     if(c == '\n')

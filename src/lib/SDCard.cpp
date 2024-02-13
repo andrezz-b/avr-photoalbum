@@ -27,7 +27,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include <SDCard.h>
+#include <lib/SDCard.h>
 #include <config.h>
 
 SDCard::SDCard(volatile uint8_t *PORT_CS, volatile uint8_t *DDR_CS, uint8_t PIN_CS)

@@ -12,7 +12,7 @@
  * @brief The Millis class manages the milliseconds timer.
  */
 
-#include <Millis.h>
+#include <lib/Millis.h>
 
 bool Millis::initialized = false;
 uint32_t Millis::counter = 0;

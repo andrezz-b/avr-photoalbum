@@ -27,7 +27,7 @@
  * <http://www.gnu.org/licenses/>.
  */
 
-#include <FAT.h>
+#include <lib/FAT.h>
 #include <stdio.h>
 
 FAT::FAT(SDCard *dev)

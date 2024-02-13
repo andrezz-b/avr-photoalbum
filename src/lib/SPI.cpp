@@ -25,7 +25,7 @@
  * along with this library. If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include <SPI.h>
+#include <lib/SPI.h>
 
 bool SPI::initialized = false;
 

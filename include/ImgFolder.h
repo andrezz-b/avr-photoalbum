@@ -5,8 +5,8 @@
 #ifndef IMGFOLDER_H_
 #define IMGFOLDER_H_
 
-#include <FAT.h>
-#include <File.h>
+#include <lib/FAT.h>
+#include <lib/File.h>
 
 /**
  * @class ImgFolder

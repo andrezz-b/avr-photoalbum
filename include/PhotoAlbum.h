@@ -5,12 +5,17 @@
 #ifndef PHOTO_ALBUM_H
 #define PHOTO_ALBUM_H
 
-#include <FAT.h>
-#include <File.h>
+#include <lib/FAT.h>
+#include <lib/File.h>
 #include <ImgFolder.h>
-#include <SDCard.h>
+#include <lib/SDCard.h>
 #include <avr/io.h>
 #include <config.h>
+#include <UTFT.h>
+
+#define TOP_UI_Y 1
+#define IMG_START_Y 15
+#define BOTTOM_UI_Y 307
 
 /**
  * @struct BMPHeader
@@ -50,7 +55,7 @@ private:
 
     void draw_title_screen();
 
-    static void bmp_draw(File& bmpFile, uint8_t x, uint8_t y);
+    void bmp_draw(File& bmpFile, uint8_t x, uint8_t y);
 
     static bool parse_bmp_header(File& file, BMPHeader& header);
 
@@ -60,6 +65,7 @@ private:
     File current_file;   /// The currently displayed file. 
     bool image_changed;  /// Flag indicating if the image has changed. 
     ImgFolder imgFolder; /// The image folder object. 
+    UTFT display;       /// The display object.
 };
 
 #endif // PHOTO_ALBUM_H

@@ -1,33 +1,33 @@
 /*
   UTFT.h - Arduino/chipKit library support for Color TFT LCD Boards
   Copyright (C)2010-2012 Henning Karlsen. All right reserved
-  
+
   This library is the continuation of my ITDB02_Graph, ITDB02_Graph16
-  and RGB_GLCD libraries for Arduino and chipKit. As the number of 
-  supported display modules and controllers started to increase I felt 
-  it was time to make a single, universal library as it will be much 
+  and RGB_GLCD libraries for Arduino and chipKit. As the number of
+  supported display modules and controllers started to increase I felt
+  it was time to make a single, universal library as it will be much
   easier to maintain in the future.
 
-  Basic functionality of this library was origianlly based on the 
-  demo-code provided by ITead studio (for the ITDB02 modules) and 
+  Basic functionality of this library was origianlly based on the
+  demo-code provided by ITead studio (for the ITDB02 modules) and
   NKC Electronics (for the RGB GLCD module/shield).
 
-  This library supports a number of 8bit, 16bit and serial graphic 
-  displays, and will work with both Arduino and chipKit boards. For a 
-  full list of tested display modules and controllers, see the 
+  This library supports a number of 8bit, 16bit and serial graphic
+  displays, and will work with both Arduino and chipKit boards. For a
+  full list of tested display modules and controllers, see the
   document UTFT_Supported_display_modules_&_controllers.pdf.
 
-  When using 8bit and 16bit display modules there are some 
-  requirements you must adhere to. These requirements can be found 
+  When using 8bit and 16bit display modules there are some
+  requirements you must adhere to. These requirements can be found
   in the document UTFT_Requirements.pdf.
   There are no special requirements when using serial displays.
 
-  You can always find the latest version of the library at 
+  You can always find the latest version of the library at
   http://electronics.henningkarlsen.com/
 
-  If you make any modifications or improvements to the code, I would 
-  appreciate that you share the code with me so that I might include 
-  it in the next release. I can be contacted through 
+  If you make any modifications or improvements to the code, I would
+  appreciate that you share the code with me so that I might include
+  it in the next release. I can be contacted through
   http://electronics.henningkarlsen.com/contact.php.
 
   This library is free software; you can redistribute it and/or
@@ -43,134 +43,159 @@
   You should have received a copy of the GNU Lesser General Public
   License along with this library; if not, write to the Free Software
   Foundation, Inc., 51 Franklin St, Fifth Floor, Boston, MA  02110-1301  USA
-  
+
   2/25/2013: Library heavily modified and tuned for speed by GizmoGarage.net
   http://gizmogarage.net/fast-avr-utft/
-    
+
 */
+/**
+ * @file UTFT.h
+ * @brief API for interfacing with UTFT displays.
+ */
 
 #ifndef UTFT_h
 #define UTFT_h
 
 #include <config.h>
 
-#define LEFT 0
-#define RIGHT 9999
-#define CENTER 9998
+/**
+ * @defgroup TEXT_ALIGN Text alignment options
+ * @brief Options for text alignment.
+ * @{
+ */
+#define LEFT   0    /**< Align text to the left of the screen */
+#define RIGHT  9999 /**< Align text to the right of the screen */
+#define CENTER 9998 /**< Align text to the center of the screen */
+/** @} */
 
-#define PORTRAIT 0
-#define LANDSCAPE 1
+/**
+ * @defgroup ORIENTATION Display orientation options
+ * @brief Options for display orientation.
+ * @{
+ */
+#define PORTRAIT  0 /**< Portrait orientation */
+#define LANDSCAPE 1 /**< Landscape orientation */
+/** @} */
 
+/**
+ * @defgroup VGA_COLORS VGA color palette
+ * @brief VGA color palette.
+ * @{
+ */
+#define VGA_BLACK   0x0000 /**< Black color */
+#define VGA_WHITE   0xFFFF /**< White color */
+#define VGA_RED     0xF800 /**< Red color */
+#define VGA_GREEN   0x0400 /**< Green color */
+#define VGA_BLUE    0x001F /**< Blue color */
+#define VGA_SILVER  0xC618 /**< Silver color */
+#define VGA_GRAY    0x8410 /**< Gray color */
+#define VGA_MAROON  0x8000 /**< Maroon color */
+#define VGA_YELLOW  0xFFE0 /**< Yellow color */
+#define VGA_OLIVE   0x8400 /**< Olive color */
+#define VGA_LIME    0x07E0 /**< Lime color */
+#define VGA_AQUA    0x07FF /**< Aqua color */
+#define VGA_TEAL    0x0410 /**< Teal color */
+#define VGA_NAVY    0x0010 /**< Navy color */
+#define VGA_FUCHSIA 0xF81F /**< Fuchsia color */
+#define VGA_PURPLE  0x8010 /**< Purple color */
+/** @} */
 
-
-//*********************************
-// COLORS
-//*********************************
-// VGA color palette
-#define VGA_BLACK		0x0000
-#define VGA_WHITE		0xFFFF
-#define VGA_RED			0xF800
-#define VGA_GREEN		0x0400
-#define VGA_BLUE		0x001F
-#define VGA_SILVER		0xC618
-#define VGA_GRAY		0x8410
-#define VGA_MAROON		0x8000
-#define VGA_YELLOW		0xFFE0
-#define VGA_OLIVE		0x8400
-#define VGA_LIME		0x07E0
-#define VGA_AQUA		0x07FF
-#define VGA_TEAL		0x0410
-#define VGA_NAVY		0x0010
-#define VGA_FUCHSIA		0xF81F
-#define VGA_PURPLE		0x8010
-
-
-	
 #include <inttypes.h>
 #include <math.h>
-#include <util/delay.h>
 #include <string.h>
-	
-#ifndef byte 
+#include <util/delay.h>
+
+#ifndef byte
 #define byte uint8_t
 #endif
 #ifndef word
 #define word uint16_t
 #endif
 #define bitmapdatatype uint16_t*
-	
-#define delay _delay_ms
-	
 
+#define delay _delay_ms
+
+/**
+ * @brief Structure representing a font in UTFT library.
+ */
 struct _current_font
 {
-	const uint8_t* font;
-	uint8_t x_size;
-	uint8_t y_size;
-	uint8_t offset;
-	uint8_t numchars;
+    const uint8_t* font; /**< Pointer to the font data. */
+    uint8_t x_size;      /**< Width of each character in pixels. */
+    uint8_t y_size;      /**< Height of each character in pixels. */
+    uint8_t offset;      /**< Offset between characters in the font data. */
+    uint8_t numchars;    /**< Number of characters in the font. */
 };
 
+/**
+ * @class UTFT
+ * @brief API for interfacing with UTFT displays.
+ */
 class UTFT
 {
-	public:
-		UTFT();
-		
-		void InitLCD(byte orientation=LANDSCAPE);
-		
-		void clrScr();
-		void drawPixel(int x, int y);
-		void drawLine(int x1, int y1, int x2, int y2);
+public:
+    UTFT();
 
-		void fillScr(byte r, byte g, byte b);
-		void fillScr(word color);
-		void drawRect(int x1, int y1, int x2, int y2);
-		void drawRoundRect(int x1, int y1, int x2, int y2);
-		void fillRect(int x1, int y1, int x2, int y2);
-		void fillRoundRect(int x1, int y1, int x2, int y2);
-		void drawCircle(int x, int y, int radius);
-		void fillCircle(int x, int y, int radius);
-		void setColor(byte r, byte g, byte b);
-		void setColor(word color);
-		word getColor();
-		void setBackColor(byte r, byte g, byte b);
-		void setBackColor(word color);
-		word getBackColor();
-		void print(const char *st, int x, int y, int deg=0);
-		void printWithMargin(const char *st, int x, int y, int limit=39);
-		//void print(String st, int x, int y, int deg=0);
-		void printNumI(uint8_t num, int x, int y, int length=0, char filler=' ');
-		void printNumF(double num, byte dec, int x, int y, char divider='.', int length=0, char filler=' ');
-		void setFont(const uint8_t* font);
-		const uint8_t* getFont();
-		uint8_t getFontXsize();
-		uint8_t getFontYsize();
-		void drawBitmap(int x, int y, int sx, int sy, const bitmapdatatype data, int scale=1);
-		void drawBitmapPB(int x, int y, int sx, int sy, const bitmapdatatype data);
-		void drawBitmap(int x, int y, int sx, int sy, const bitmapdatatype data, int deg, int rox, int roy);
-		void lcdOff();
-		void lcdOn();
-		void setContrast(char c);
-		int  getDisplayXSize();
-		int	 getDisplayYSize();
-		int setPixels( word color, uint16_t x, uint16_t y, uint32_t pixels );
-		
-	protected:
-		byte fch, fcl, bch, bcl;
-		byte orient;
-		long disp_x_size, disp_y_size;
-		_current_font	cfont;
-		
-		void _hw_special_init();
-		void setPixel(word color);
-		void drawHLine(int x, int y, int l);
-		void drawVLine(int x, int y, int l);
-		void printChar(byte c, int x, int y);
-		void printChar2(byte c, int x, int y);
-		void rotateChar(byte c, int x, int y, int pos, int deg);
-		void setXY(word x1, word y1, word x2, word y2);
-		void clrXY();
+    void InitLCD(byte orientation = LANDSCAPE);
 
+    void clrScr();
+    void drawPixel(int x, int y);
+    void drawLine(int x1, int y1, int x2, int y2);
+
+    void fillScr(byte r, byte g, byte b);
+    void fillScr(word color);
+    void drawRect(int x1, int y1, int x2, int y2);
+    void drawRoundRect(int x1, int y1, int x2, int y2);
+    void fillRect(int x1, int y1, int x2, int y2);
+    void fillRoundRect(int x1, int y1, int x2, int y2);
+    void drawCircle(int x, int y, int radius);
+    void fillCircle(int x, int y, int radius);
+    void setColor(byte r, byte g, byte b);
+    void setColor(word color);
+    word getColor();
+    void setBackColor(byte r, byte g, byte b);
+    void setBackColor(word color);
+    word getBackColor();
+    void print(const char* st, int x, int y, int deg = 0);
+    void printWithMargin(const char* st, int x, int y, int limit = 39);
+    // void print(String st, int x, int y, int deg=0);
+    void printNumI(uint8_t num, int x, int y, int length = 0, char filler = ' ');
+    void printNumF(double num, byte dec, int x, int y, char divider = '.', int length = 0,
+                   char filler = ' ');
+    void setFont(const uint8_t* font);
+    const uint8_t* getFont();
+    uint8_t getFontXsize();
+    uint8_t getFontYsize();
+    void drawBitmap(int x, int y, int sx, int sy, const bitmapdatatype data, int scale = 1);
+    void drawBitmapPB(int x, int y, int sx, int sy, const bitmapdatatype data);
+    void drawBitmap(int x, int y, int sx, int sy, const bitmapdatatype data, int deg, int rox,
+                    int roy);
+    void lcdOff();
+    void lcdOn();
+    void setContrast(char c);
+    int getDisplayXSize();
+    int getDisplayYSize();
+    int setPixels(word color, uint16_t x, uint16_t y, uint32_t pixels);
+
+protected:
+    byte fch;            ///< Foreground color high byte.
+    byte fcl;            ///< Foreground color low byte.
+    byte bch;            ///< Background color high byte.
+    byte bcl;            ///< Background color low byte.
+    byte orient;         ///< Display orientation. Can be either PORTRAIT or LANDSCAPE.
+    long disp_x_size;    ///< The horizontal size of the display in pixels.
+    long disp_y_size;    ///< The vertical size of the display in pixels.
+    _current_font cfont; ///< The current font used for displaying text.
+
+    void _hw_special_init();
+    void setPixel(word color);
+    void drawHLine(int x, int y, int l);
+    void drawVLine(int x, int y, int l);
+    void printChar(byte c, int x, int y);
+    void printChar2(byte c, int x, int y);
+    void rotateChar(byte c, int x, int y, int pos, int deg);
+    void setXY(word x1, word y1, word x2, word y2);
+    void clrXY();
 };
 
 #endif
